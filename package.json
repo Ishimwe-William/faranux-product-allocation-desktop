@@ -1,0 +1,26 @@
+{
+  "name": "faranux-product-allocation",
+  "appId": "com.bunsenplus.fxproductallocation",
+  "version": "1.0.0",
+  "description": "Desktop application for product allocation management",
+  "icon": "./assets/icon.png",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --debug"
+  },
+  "keywords": [
+    "inventory",
+    "management",
+    "electron"
+  ],
+  "author": "WILLIAM ISHIMWE",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "electron": "^28.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.0.12"
+  }
+}

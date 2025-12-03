@@ -1,0 +1,129 @@
+
+/* ============================================
+   products.css - Products Search View
+   ============================================ */
+
+.products-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.product-card {
+  padding: var(--spacing-md);
+}
+
+.product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-sm);
+}
+
+.product-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.qty-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px 10px;
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-full);
+}
+
+.qty-badge .material-icons {
+  font-size: 16px;
+}
+
+.qty-text {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.product-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.meta-item .material-icons {
+  font-size: 14px;
+}
+
+.sku-text {
+  font-family: var(--font-mono);
+}
+
+.locations-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.location-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm);
+  background-color: var(--color-background);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.location-row:hover {
+  background-color: var(--color-surface-variant);
+}
+
+.location-details {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.location-icon {
+  color: var(--color-primary);
+}
+
+.location-branch {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.location-shelf {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.position-badge {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+}
