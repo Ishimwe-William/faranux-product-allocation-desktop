@@ -28,6 +28,8 @@ import { renderDisplaySettingsView } from './views/displaySettings.js';
 import { renderDiagnosticsView } from './views/diagnostics.js';
 import { setupAuthHandlers as initAuthHandlers, showAuthScreen, hideAuthScreen, resetAuthForm, updateUserDisplay } from './views/auth.js';
 
+import { showCustomConfirm } from './components/modal.js';
+
 // DOM Elements
 let authScreen, appContainer, authForm, authError;
 let loadingOverlay, loadingText;
@@ -35,6 +37,8 @@ let loadingOverlay, loadingText;
 // Track initialization state
 let isAppInitialized = false;
 let wasAuthenticated = false;
+// Keep previous state snapshot to detect data changes
+let prevState = null;
 
 // Initialize app
 async function initApp() {
@@ -54,7 +58,9 @@ async function initApp() {
     await initializeFirebase();
 
     // Subscribe to state changes
-    store.subscribe(handleStateChange);
+      // Capture initial state snapshot
+      prevState = store.getState();
+      store.subscribe(handleStateChange);
 
     // Setup auth form handlers
     setupAuthHandlers();
@@ -65,13 +71,28 @@ async function initApp() {
     // Register routes
     registerRoutes();
 
-    // Check initial auth state
+    // Load necessary data before showing any UI (auth or app)
+    await loadInitialData();
+
+    // Apply theme from store (light / dark / system)
+    try {
+      const theme = store.getState().display?.theme || 'system';
+      applyTheme(theme);
+      // React to future display.theme changes
+      store.subscribe((s) => {
+        if (s.display && s.display.theme) applyTheme(s.display.theme);
+      });
+    } catch (err) {
+      // ignore theme apply errors
+    }
+
+    // Check initial auth state and show appropriate view
     const state = store.getState();
     wasAuthenticated = state.auth.isAuthenticated;
-    
     if (state.auth.isAuthenticated) {
       showApp();
-      await loadInitialData();
+      // Apply initial sidebar state from store
+      updateSidebarUI(state.display?.sidebarCollapsed || false);
     } else {
       showAuth();
     }
@@ -92,11 +113,39 @@ function setupAuthHandlers() {
 function setupAppHandlers() {
   // Logout button
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    if (confirm('Are you sure you want to logout?')) {
+    const isConfirmed = await showCustomConfirm(
+        'Logout',
+        'Are you sure you want to logout?',
+        'warning'
+    );
+
+    if (isConfirmed) {
       await signOut();
       resetAuthForm();
       showAuthScreen(authScreen, appContainer);
     }
+  });
+
+  // Sidebar toggle button (now in sidebar header)
+  const sidebarToggle = document.getElementById('sidebar-toggle-btn');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      const state = store.getState();
+      const newCollapsedState = !state.display.sidebarCollapsed;
+      store.setDisplaySettings({ sidebarCollapsed: newCollapsedState });
+      updateSidebarUI(newCollapsedState);
+    });
+  }
+
+  // Top bar navigation icons
+  const navButtons = document.querySelectorAll('[id^="nav-"][id$="-btn"]');
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const route = btn.getAttribute('data-route');
+      if (route) {
+        router.navigate('/' + route);
+      }
+    });
   });
 
   // Sync button
@@ -161,6 +210,26 @@ function handleStateChange(state) {
       syncTime.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
   }
+
+  // If shelves or products data changed compared to previous snapshot, re-render current route
+  try {
+    const prevShelvesCount = prevState?.shelves?.items?.length || 0;
+    const prevProductsSync = prevState?.products?.lastSync || null;
+    const newShelvesCount = state?.shelves?.items?.length || 0;
+    const newProductsSync = state?.products?.lastSync || null;
+
+    if (prevShelvesCount !== newShelvesCount || prevProductsSync !== newProductsSync) {
+      // Re-run the current route handler to refresh the view (e.g., shelves view)
+      if (router && typeof router.handleRoute === 'function') {
+        router.handleRoute();
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to auto-refresh route on state change:', err);
+  }
+
+  // Update previous state snapshot
+  prevState = state;
 }
 
 // Load initial data
@@ -244,4 +313,48 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
   initApp();
+}
+
+// Apply theme helper used across app
+function applyTheme(theme) {
+  const htmlEl = document.documentElement;
+  const body = document.body;
+  // keep body classes for backward compatibility
+  body.classList.remove('theme-light', 'theme-dark');
+  htmlEl.removeAttribute('data-theme');
+
+  if (theme === 'light') {
+    body.classList.add('theme-light');
+    htmlEl.setAttribute('data-theme', 'light');
+  } else if (theme === 'dark') {
+    body.classList.add('theme-dark');
+    htmlEl.setAttribute('data-theme', 'dark');
+  } else {
+    // system preference
+    const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    const prefersDark = mq ? mq.matches : false;
+    body.classList.toggle('theme-dark', prefersDark);
+    body.classList.toggle('theme-light', !prefersDark);
+    htmlEl.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    // Listen to changes
+    if (mq) {
+      mq.addEventListener ? mq.addEventListener('change', (e) => {
+        body.classList.toggle('theme-dark', e.matches);
+        body.classList.toggle('theme-light', !e.matches);
+        htmlEl.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      }) : mq.addListener((e) => {
+        body.classList.toggle('theme-dark', e.matches);
+        body.classList.toggle('theme-light', !e.matches);
+        htmlEl.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      });
+    }
+  }
+}
+
+// Update sidebar UI based on collapsed state
+function updateSidebarUI(isCollapsed) {
+  const appContainer = document.getElementById('app-container');
+  if (appContainer) {
+    appContainer.classList.toggle('sidebar-collapsed', isCollapsed);
+  }
 }

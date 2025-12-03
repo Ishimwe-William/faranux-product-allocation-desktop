@@ -14,7 +14,6 @@ const envPromise = (async () => {
       const env = await window.electronAPI.getEnv();
       GSHEETS_API_KEY = env?.GSHEETS_API_KEY || null;
       GSHEET_ID = env?.GSHEET_ID || null;
-      console.log('Environment loaded via Electron IPC');
     } else if (typeof process !== 'undefined' && process.env) {
       GSHEETS_API_KEY = process.env.EXPO_PUBLIC_GSHEETS_API_KEY || null;
       GSHEET_ID = process.env.EXPO_PUBLIC_GSHEET_ID || null;
@@ -219,7 +218,6 @@ export async function fetchProducts(sheetId = null) {
   await envPromise;
   try {
     const id = sheetId || getCurrentSheetId();
-    console.log(`[GoogleSheets] Fetching products for ID: ${id}`);
 
     if (!id || !GSHEETS_API_KEY) throw new Error('Missing Sheet ID or API Key');
 
@@ -270,8 +268,6 @@ export async function fetchLocations(sheetId = null) {
   await envPromise;
   try {
     const id = sheetId || getCurrentSheetId();
-    console.log(`[GoogleSheets] Fetching locations for ID: ${id}`);
-
     if (!id || !GSHEETS_API_KEY) throw new Error('Missing Sheet ID or API Key');
 
     const fileId = extractFileId(id);
@@ -306,7 +302,6 @@ export async function fetchLocations(sheetId = null) {
 
     // 4. Fetch the Location Tab
     const sheetName = locationsSheet.properties?.title;
-    console.log(`[GoogleSheets] Found Location tab: "${sheetName}"`);
 
     const valuesUrl = `${GSHEETS_API_BASE}/${id}/values/${encodeURIComponent(sheetName)}?key=${GSHEETS_API_KEY}`;
     const valuesResponse = await fetch(valuesUrl);
@@ -324,8 +319,6 @@ export async function fetchLocations(sheetId = null) {
       });
       return location;
     }).filter(l => l.sku && l.branch && l.shelf);
-
-    console.log(`[GoogleSheets] Successfully parsed ${locations.length} locations.`);
     return locations;
 
   } catch (error) {

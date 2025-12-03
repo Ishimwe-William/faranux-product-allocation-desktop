@@ -1,36 +1,5 @@
-:root {
-  /* Core colors */
-  --color-primary: #932013;
-  --color-primary-dark: #7a1b0f;
-  --color-primary-light: #b52818;
-
-  --color-secondary: #2563eb;
-  --color-accent: #f59e0b;
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
-  
-  /* Background and surface colors */
-  --color-background: #f8f9fa;
-  --color-surface: #ffffff;
-  --color-surface-variant: #f3f4f6;
-  --color-surface-hover: #e5e7eb;
-  
-  /* Border colors */
-  --color-border: #e5e7eb;
-  --color-border-light: #f3f4f6;
-  
-  /* Text colors */
-  --color-text: #1f2937;
-  --color-text-secondary: #4b5563;
-  --color-text-tertiary: #9ca3af;
-  
-  /* Shadow system */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.12);
-}
+/* Sidebar intentionally uses global variables defined in `variables.css`.
+   This file should not redefine color variables so theming applies consistently */
 /* ============================================
    sidebar.css - Sidebar Navigation
    ============================================ */
@@ -42,31 +11,93 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width var(--transition-base);
+  overflow-x: hidden; /* Prevent content from spilling during transition */
+  white-space: nowrap; /* Prevent text wrapping during transition */
 }
+
+/* ============================================
+   Collapsed State Logic
+   ============================================ */
+
+/* 1. Shrink width */
+.app-container.sidebar-collapsed .sidebar {
+  width: var(--collapsed-sidebar-width);
+}
+
+/* 2. Hide text elements (Nav labels, User details, Header title, Logout text) */
+.app-container.sidebar-collapsed .sidebar .nav-item span:not(.material-icons),
+.app-container.sidebar-collapsed .sidebar .user-details,
+.app-container.sidebar-collapsed .sidebar .sidebar-header h2,
+.app-container.sidebar-collapsed .sidebar #logout-btn span:not(.material-icons) {
+  display: none;
+}
+
+/* 3. Center Navigation Items */
+.app-container.sidebar-collapsed .sidebar .nav-item {
+  justify-content: center;
+  padding: 12px;
+}
+
+/* 4. Center Footer/Logout Items */
+.app-container.sidebar-collapsed .sidebar .sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.app-container.sidebar-collapsed .sidebar .user-info {
+  justify-content: center;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.app-container.sidebar-collapsed .sidebar .user-info .material-icons {
+  margin: 0;
+}
+
+.app-container.sidebar-collapsed .sidebar #logout-btn {
+  justify-content: center;
+  padding: 8px;
+  width: 40px; /* Force square ratio for icon */
+}
+
+/* ============================================
+   Standard Styles
+   ============================================ */
 
 .sidebar-header {
   height: var(--topbar-height);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: 0 var(--spacing-lg);
+  padding: 0 var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-header #sidebar-toggle-btn {
+  flex-shrink: 0;
+  margin-right: 4px;
 }
 
 .sidebar-header .material-icons {
   font-size: 28px;
   color: var(--color-primary);
+  flex-shrink: 0;
 }
 
 .sidebar-header h2 {
   font-size: 18px;
   font-weight: 700;
+  margin: 0;
 }
 
 .sidebar-nav {
   flex: 1;
   padding: var(--spacing-md);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .nav-item {
@@ -78,10 +109,12 @@
   color: var(--color-text-secondary);
   transition: all var(--transition-base);
   margin-bottom: var(--spacing-xs);
+  text-decoration: none; /* Ensure no underline on links */
 }
 
 .nav-item .material-icons {
   font-size: 22px;
+  flex-shrink: 0; /* Stop icon from squishing */
 }
 
 .nav-item span:not(.material-icons) {
@@ -102,7 +135,7 @@
 .sidebar-footer {
   padding: var(--spacing-md);
   border-top: 1px solid var(--color-border);
-  margin-bottom: var(--spacing-lg);
+  /*margin-bottom: var(--spacing-md);*/
 }
 
 .user-info {
@@ -116,6 +149,7 @@
 .user-info .material-icons {
   font-size: 32px;
   color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .user-details {
@@ -130,4 +164,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Ensure logout button aligns with other items */
+#logout-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm); /* Matches nav-item gap */
+  width: 100%;
 }

@@ -58,6 +58,18 @@
   border-radius: var(--radius-full);
 }
 
+/* Make icon-only buttons visible in both themes */
+.btn-icon {
+  background-color: var(--color-surface-variant);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-icon:hover {
+  background-color: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+
 .btn-small {
   padding: 6px 12px;
   font-size: 13px;
@@ -159,6 +171,12 @@
   pointer-events: none;
 }
 
+/* Top bar icon buttons should show the icon in the theme text color */
+.top-bar .btn-icon .material-icons,
+.btn-icon .material-icons {
+  color: var(--color-text);
+}
+
 /* Badges */
 .badge {
   display: inline-flex;
@@ -171,7 +189,7 @@
 }
 
 .badge-primary {
-  background-color: rgba(147, 32, 19, 0.2);
+  background-color: rgba(var(--color-primary-rgb), 0.2);
   color: var(--color-primary-light);
 }
 

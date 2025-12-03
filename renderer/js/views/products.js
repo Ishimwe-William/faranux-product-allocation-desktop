@@ -14,10 +14,10 @@ export function renderProductsView() {
   document.getElementById('breadcrumbs').textContent = 'Products';
   
   let html = `
-    <div class="products-header">
-      <div class="search-bar">
+    <div class="products-header" style="display:flex; align-items:center; justify-content:center; margin-bottom:var(--spacing-lg);">
+      <div class="search-bar shelf-search-centered">
         <span class="material-icons">search</span>
-        <input type="text" id="product-search" placeholder="Search SKU, name...">
+        <input type="text" id="product-search" placeholder="Search products...">
       </div>
     </div>
     
@@ -52,7 +52,8 @@ export function renderProductsView() {
     row.addEventListener('click', () => {
       const shelfId = row.dataset.shelfId;
       const position = row.dataset.position;
-      router.navigate(`/shelf/${shelfId}`, { highlightPosition: position });
+      const sku = row.dataset.sku;
+      router.navigate(`/shelf/${shelfId}`, { highlightPosition: position, searchSku: sku });
     });
   });
 }
@@ -70,12 +71,15 @@ function renderProductCard(product, locations) {
     qtyColor = '#f59e0b';
   }
   
+  const fullProductName = product.product_name || 'Unnamed Product';
+  const displayProductName = fullProductName.length > 25 ? fullProductName.substring(0, 25) + '...' : fullProductName;
+  
   const productLocations = findProductLocations(locations, product.sku);
   
   let html = `
     <div class="card product-card">
       <div class="product-header">
-        <h3 class="product-name">${product.product_name || 'Unnamed Product'}</h3>
+        <h3 class="product-name" title="${fullProductName}">${displayProductName}</h3>
         <div class="qty-badge">
           <span class="material-icons" style="color: ${qtyColor}">${qtyIcon}</span>
           <span class="qty-text" style="color: ${qtyColor}">${qty}</span>
@@ -111,7 +115,7 @@ function renderProductCard(product, locations) {
   } else {
     productLocations.forEach(loc => {
       html += `
-        <div class="location-row" data-shelf-id="${loc.shelfId}" data-position="${loc.position}">
+        <div class="location-row" data-shelf-id="${loc.shelfId}" data-position="${loc.position}" data-sku="${product.sku}">
           <div class="location-details">
             <span class="material-icons location-icon">store</span>
             <span class="location-branch">${loc.branch}</span>

@@ -52,15 +52,11 @@ async function loadFirebaseConfig() {
 export async function initializeFirebase() {
   try {
     if (isInitialized) {
-      console.log('[Firebase] Already initialized, returning existing instance');
       return { app, auth, db };
     }
 
-    console.log('[Firebase] Starting initialization...');
-
     // Load configuration first
     await loadFirebaseConfig();
-    console.log('[Firebase] Config loaded, initializing Firebase...');
 
     if (!window.firebase) {
       throw new Error('Firebase SDK not loaded. Check if Firebase scripts are included in HTML.');
@@ -71,8 +67,6 @@ export async function initializeFirebase() {
     db = firebase.firestore();
 
     isInitialized = true;
-
-    console.log('[Firebase] Firebase initialized successfully');
 
     auth.onAuthStateChanged(user => {
       if (user) {
@@ -86,9 +80,8 @@ export async function initializeFirebase() {
           unsubscribeConfig(); // Cleanup any existing listener
         }
 
-        console.log('[Firebase] Subscribing to config changes...');
         unsubscribeConfig = subscribeToConfig((config) => {
-          console.log('[Firebase] App config updated:', config?.sheetId);
+
         });
 
       } else {
@@ -102,7 +95,6 @@ export async function initializeFirebase() {
       }
     });
 
-    console.log('Firebase initialized successfully');
     return { app, auth, db };
   } catch (error) {
     console.error('Firebase initialization error:', error);
@@ -117,7 +109,6 @@ export async function signIn(email, password) {
       throw new Error('Firebase not initialized. Please reload the app.');
     }
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
-    console.log('User signed in:', userCredential.user.email);
     return userCredential.user;
   } catch (error) {
     console.error('Sign in error:', error.code, error.message);
@@ -132,7 +123,6 @@ export async function signUp(email, password) {
       throw new Error('Firebase not initialized. Please reload the app.');
     }
     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-    console.log('User created:', userCredential.user.email);
     return userCredential.user;
   } catch (error) {
     console.error('Sign up error:', error.code, error.message);

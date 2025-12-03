@@ -15,7 +15,8 @@
     <link rel="stylesheet" href="css/products.css">
     <link rel="stylesheet" href="css/settings.css">
     <link rel="stylesheet" href="css/auth.css">
-    
+    <link rel="stylesheet" href="css/modal.css">
+
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
@@ -29,7 +30,7 @@
 <!--    </div>-->
 
     <!-- Auth Screen (shown when not authenticated) -->
-    <div id="auth-screen" class="auth-container" style="display: flex;">
+    <div id="auth-screen" class="auth-container" style="display: none;">
         <div class="auth-card">
             <div class="auth-header">
                 <h1>Inventory Manager</h1>
@@ -64,7 +65,9 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <span class="material-icons">inventory_2</span>
+                <button class="btn btn-icon" id="sidebar-toggle-btn" title="Toggle Sidebar" style="padding: 4px;">
+                    <span class="material-icons">menu</span>
+                </button>
                 <h2>Inventory</h2>
             </div>
             
@@ -90,9 +93,9 @@
                         <span class="user-email" id="sidebar-user-email">user@example.com</span>
                     </div>
                 </div>
-                <button class="btn btn-text btn-small" id="logout-btn">
+                <button class="nav-item " id="logout-btn">
                     <span class="material-icons">logout</span>
-                    Logout
+                    <span>Logout</span>
                 </button>
             </div>
         </aside>
@@ -101,8 +104,11 @@
         <main class="main-content">
             <!-- Top Bar -->
             <header class="top-bar">
-                <div class="breadcrumbs" id="breadcrumbs">
-                    <span>Shelves</span>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="material-icons" id="view-icon" style="font-size: 24px; color: var(--color-primary); display: none;">shelves</span>
+                    <div class="breadcrumbs" id="breadcrumbs">
+                        <span>Shelves</span>
+                    </div>
                 </div>
                 <div class="top-bar-actions">
                     <button class="btn btn-icon" id="sync-btn" title="Sync Data">
@@ -123,7 +129,7 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div id="loading-overlay" class="loading-overlay" style="display: flex;">
         <div class="spinner"></div>
         <p id="loading-text">Loading...</p>
     </div>

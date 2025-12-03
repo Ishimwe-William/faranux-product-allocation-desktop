@@ -2,6 +2,8 @@
    store.js - State Management
    ============================================ */
 
+// ToDo: add network state
+// ToDo: create error pages
 export class Store {
   constructor() {
     this.state = {
@@ -36,7 +38,11 @@ export class Store {
         gridDensity: 'normal',
         compactMode: false,
         showGridLabels: true,
-        animationsEnabled: true
+        animationsEnabled: true,
+        // theme: 'system' | 'light' | 'dark'
+        theme: 'system',
+        // sidebar: true (expanded) | false (collapsed)
+        sidebarCollapsed: false
       }
     };
     

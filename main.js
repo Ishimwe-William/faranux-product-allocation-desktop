@@ -4,6 +4,8 @@ require('dotenv').config();
 
 let mainWindow;
 
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -23,7 +25,7 @@ function createWindow() {
   mainWindow.loadFile('renderer/index.html');
 
   // Always open DevTools to see errors
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   // Log when ready
   mainWindow.webContents.on('did-finish-load', () => {
@@ -54,11 +56,6 @@ app.on('activate', () => {
   }
 });
 
-// IPC Handlers
-ipcMain.handle('get-app-version', () => {
-  return app.getVersion();
-});
-
 // Get environment variables (safe to expose public Firebase config and Google Sheets config)
 ipcMain.handle('get-env', () => {
   return {
@@ -70,6 +67,7 @@ ipcMain.handle('get-env', () => {
     FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
     GSHEETS_API_KEY: process.env.EXPO_PUBLIC_GSHEETS_API_KEY,
     GSHEET_ID: process.env.EXPO_PUBLIC_GSHEET_ID,
+    APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
     DEBUG: process.env.DEBUG === 'true',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info'
   };

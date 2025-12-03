@@ -10,7 +10,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--color-background) 0%, #1a1210 100%);
+  /* Use theme-aware variables for gradient instead of hardcoded hex */
+  background: linear-gradient(135deg, var(--color-background) 0%, var(--color-surface) 100%);
 }
 
 /* Main App Layout */
@@ -19,6 +20,48 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+/* Sidebar collapse/expand transition */
+.sidebar {
+  transition: width var(--transition-base), margin var(--transition-base);
+}
+
+/* Collapsed sidebar state */
+.app-container.sidebar-collapsed .sidebar {
+  width: 70px;
+}
+
+.app-container.sidebar-collapsed .sidebar-header h2 {
+  display: none;
+}
+
+.app-container.sidebar-collapsed .nav-item span:not(.material-icons) {
+  display: none;
+}
+
+.app-container.sidebar-collapsed .sidebar-footer {
+  padding: var(--spacing-sm);
+}
+
+.app-container.sidebar-collapsed .user-info {
+  padding: 0;
+}
+
+.app-container.sidebar-collapsed .user-info .material-icons {
+  margin: 0 auto;
+}
+
+.app-container.sidebar-collapsed .user-details,
+.app-container.sidebar-collapsed .sidebar-footer button span:not(.material-icons),
+.app-container.sidebar-collapsed .sidebar-footer button .material-icons:nth-child(2) {
+  display: none;
+}
+
+.app-container.sidebar-collapsed .sidebar-footer button {
+  width: 100%;
+  padding: 8px 0;
+  justify-content: center;
 }
 
 /* Main Content */

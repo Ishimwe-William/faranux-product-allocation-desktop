@@ -53,22 +53,31 @@ export function renderShelfDetailView(params) {
     <div class="grid-container">
       <div class="grid-header">
         <h3 class="grid-title">Layout</h3>
-        <div class="grid-legend">
-          <div class="legend-item">
-            <div class="legend-dot" style="background-color: var(--color-primary)"></div>
-            <span>Full</span>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="grid-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: var(--color-primary)"></div>
+              <span>Full</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: var(--color-accent)"></div>
+              <span>Partial</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background-color: var(--color-surface)"></div>
+              <span>Empty</span>
+            </div>
           </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background-color: var(--color-accent)"></div>
-            <span>Partial</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background-color: var(--color-surface)"></div>
-            <span>Empty</span>
+
+          <!-- Product search within shelf -->
+          <div style="display:flex; align-items:center; gap:8px; margin-left:16px;">
+            <span class="material-icons">search</span>
+            <input id="shelf-product-search" placeholder="Search product..." style="padding:8px 10px; font-size:14px; border-radius:6px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); min-width:250px;" />
+            <span id="shelf-search-result" style="font-size:13px; color:var(--color-text-secondary); margin-left:8px;"></span>
           </div>
         </div>
       </div>
-      
+
       <div class="grid-matrix">
         ${renderGrid(shelf)}
       </div>
@@ -84,6 +93,79 @@ export function renderShelfDetailView(params) {
       handleBoxClick(shelf, boxId);
     });
   });
+
+  // Setup product search within shelf
+  const productSearch = document.getElementById('shelf-product-search');
+  const searchResultEl = document.getElementById('shelf-search-result');
+  let lastFoundEl = null;
+
+  if (productSearch) {
+    productSearch.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      clearFoundHighlight();
+      if (!q) {
+        if (searchResultEl) searchResultEl.textContent = '';
+        return;
+      }
+
+      // Search across boxes in this shelf
+      // box.products contains SKU strings, not product objects
+      const allProducts = store.getState().products.items || [];
+      let found = null;
+      for (const box of shelf.boxes) {
+        if (!box.products) continue;
+        const match = box.products.find(sku => {
+          const product = allProducts.find(p => p.sku === sku);
+          if (!product) return sku.toLowerCase().includes(q);
+          const name = (product.product_name || '').toString().toLowerCase();
+          const skuLower = (product.sku || '').toString().toLowerCase();
+          const category = (product.category || '').toString().toLowerCase();
+          return name.includes(q) || skuLower.includes(q) || category.includes(q);
+        });
+        if (match) {
+          const matchedProduct = allProducts.find(p => p.sku === match);
+          found = { box, match: matchedProduct || { sku: match } };
+          break;
+        }
+      }
+
+      if (found) {
+        const el = document.querySelector(`.grid-cell[data-box-id="${found.box.id}"]`);
+        if (el) {
+          el.classList.add('found');
+          // add badge
+          const badge = document.createElement('div');
+          badge.className = 'found-badge';
+          badge.textContent = 'Found';
+          el.appendChild(badge);
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          lastFoundEl = el;
+          if (searchResultEl) searchResultEl.textContent = `${found.match.product_name || found.match.sku || 'Product'} — Box ${found.box.position}`;
+        }
+      } else {
+        if (searchResultEl) searchResultEl.textContent = 'No matching product in this shelf';
+      }
+    });
+  }
+
+  function clearFoundHighlight() {
+    try {
+      document.querySelectorAll('.grid-cell.found').forEach(el => {
+        el.classList.remove('found');
+        const badge = el.querySelector('.found-badge');
+        if (badge) badge.remove();
+      });
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  // Auto-search if searchSku param passed from products view
+  if (params.searchSku && productSearch) {
+    productSearch.value = params.searchSku;
+    const event = new Event('input', { bubbles: true });
+    productSearch.dispatchEvent(event);
+  }
 }
 
 function renderGrid(shelf) {

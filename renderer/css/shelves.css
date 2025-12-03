@@ -5,8 +5,33 @@
 .shelves-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center; /* center the search */
   margin-bottom: var(--spacing-lg);
+}
+
+.shelves-header .search-bar {
+  width: 70%;
+  max-width: 900px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 8px 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.shelves-header .search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.shelf-search-centered {
+  margin: 0 auto;
 }
 
 .shelves-grid {
@@ -233,6 +258,26 @@
   border-width: 3px;
   border-color: var(--color-text);
   box-shadow: var(--shadow-lg);
+}
+
+/* Highlighted cell when a searched product is found */
+.grid-cell.found {
+  box-shadow: 0 0 0 3px rgba(147,32,19,0.18); /* subtle ring in primary */
+  border-color: var(--color-primary);
+  transform: scale(1.04);
+  z-index: 20;
+}
+
+.found-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
 }
 
 .cell-label {

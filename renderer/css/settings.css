@@ -1,94 +1,130 @@
-
 /* ============================================
    settings.css - Settings View
    ============================================ */
 
-.settings-section {
-  margin-bottom: var(--spacing-xl);
+/* Main View Container */
+.settings-view-container {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
 }
 
-.section-title {
-  font-size: 14px;
+/* Card Header Styles */
+.settings-card-header {
+  margin-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-sm);
+}
+
+.settings-card-header.padded {
+  padding: var(--spacing-md);
+  margin-bottom: 0;
+}
+
+.settings-card-title {
+  font-size: 16px;
   font-weight: 700;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* Form & Input Styles */
+.settings-form-group {
   margin-bottom: var(--spacing-md);
 }
 
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
-}
-
-.stat-card {
-  background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.stat-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
-}
-
-.stat-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-sm);
-}
-
-.stat-card-icon {
-  color: var(--color-primary);
-  font-size: 24px;
-}
-
-.stat-card-count {
-  font-size: 28px;
-  font-weight: 700;
+.settings-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
   color: var(--color-text);
-  margin-bottom: var(--spacing-xs);
 }
 
-.stat-card-label {
+.settings-input-wrapper {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.settings-input-field {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: 14px;
+  transition: border-color var(--transition-base);
+}
+
+.settings-input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.settings-helper-text {
+  margin-top: 8px;
   font-size: 12px;
   color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.stat-card-sync {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
+.settings-helper-icon {
+  font-size: 14px;
 }
 
-.settings-card {
-  background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  overflow: hidden;
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
+/* System Info Grid */
+.system-info-grid {
+  display: grid;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.system-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.system-info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.system-label {
+  color: var(--color-text-secondary);
+}
+
+.system-value {
+  font-weight: 500;
+}
+
+.system-value.mono {
+  font-family: var(--font-mono);
+}
+
+/* Theme & Row Styles (retained/refined from previous) */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
-  cursor: pointer;
   transition: background-color var(--transition-base);
 }
 
 .settings-row:hover {
   background-color: var(--color-surface-variant);
-}
-
-.settings-row:not(:last-child) {
-  border-bottom: 1px solid var(--color-border);
 }
 
 .settings-row-left {
@@ -104,6 +140,11 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
+  background-color: var(--color-surface-variant);
+}
+
+.settings-icon-box .material-icons {
+  color: var(--color-primary);
 }
 
 .settings-row-info h4 {
@@ -116,4 +157,20 @@
 .settings-row-info p {
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+.theme-options {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.theme-option {
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.theme-option input {
+  margin-right: 6px;
 }

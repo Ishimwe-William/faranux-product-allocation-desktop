@@ -5,6 +5,13 @@
 import { store } from '../store.js';
 import { router } from '../router.js';
 
+// Helper to trim text to max length with ellipsis
+function trimText(text, maxLength = 25) {
+  if (!text) return '';
+  const str = String(text);
+  return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+}
+
 export function renderShelvesView() {
   const container = document.getElementById('view-container');
   const state = store.getState();
@@ -15,7 +22,7 @@ export function renderShelvesView() {
   
   let html = `
     <div class="shelves-header">
-      <div class="search-bar">
+      <div class="search-bar shelf-search-centered">
         <span class="material-icons">search</span>
         <input type="text" id="shelf-search" placeholder="Search shelves...">
       </div>
@@ -66,13 +73,14 @@ function renderShelfCard(shelf) {
   else if (utilization >= 50) statusColor = '#f59e0b'; // warning
   
   return `
-    <div class="card card-clickable shelf-card" data-shelf-id="${shelf.id}">
+    <div class="card card-clickable shelf-card" data-shelf-id="${shelf.id}" data-all-products="${shelf.boxes.map(b => b.products.join(',')).join(',')}">
       <div class="shelf-card-header">
-        <h3 class="shelf-name">${shelf.name}</h3>
+        <h3 class="shelf-name" title="${shelf.name}">${trimText(shelf.name)}</h3>
         <div class="branch-badge">
           <span class="material-icons">store</span>
           <span>${shelf.branch}</span>
         </div>
+        <div class="product-found-indicator" style="display:none; background-color:var(--color-primary); color:white; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; white-space:nowrap;"></div>
       </div>
       
       <div class="utilization-bar">
@@ -106,15 +114,56 @@ function renderShelfCard(shelf) {
 }
 
 function handleSearch(e) {
-  const query = e.target.value.toLowerCase();
+  const query = e.target.value.toLowerCase().trim();
   const cards = document.querySelectorAll('.shelf-card');
+  const state = store.getState();
+  const products = state.products.items || [];
   
   cards.forEach(card => {
-    const text = card.textContent.toLowerCase();
-    if (text.includes(query)) {
+    const shelfName = card.querySelector('.shelf-name').textContent.toLowerCase();
+    const branch = card.querySelector('.branch-badge span:last-child').textContent.toLowerCase();
+    const indicator = card.querySelector('.product-found-indicator');
+    
+    if (!query) {
+      // No search query - show all cards and hide indicators
       card.style.display = '';
+      indicator.style.display = 'none';
+      return;
+    }
+    
+    // Search shelf name and branch
+    const shelfMatch = shelfName.includes(query) || branch.includes(query);
+    
+    // Search products in this shelf
+    const allProductSkus = card.getAttribute('data-all-products').split(',').filter(s => s);
+    let productMatch = null;
+    for (const sku of allProductSkus) {
+      const product = products.find(p => p.sku === sku);
+      if (product) {
+        const pname = (product.product_name || '').toLowerCase();
+        const psku = (product.sku || '').toLowerCase();
+        const category = (product.category || '').toLowerCase();
+        if (pname.includes(query) || psku.includes(query) || category.includes(query)) {
+          productMatch = product;
+          break;
+        }
+      }
+    }
+    
+    // Show/hide card and display indicator if product found
+    if (shelfMatch || productMatch) {
+      card.style.display = '';
+      if (productMatch) {
+        const displayName = trimText(productMatch.product_name || productMatch.sku, 18);
+        indicator.textContent = `📦 ${displayName}`;
+        indicator.title = productMatch.product_name || productMatch.sku;
+        indicator.style.display = 'block';
+      } else {
+        indicator.style.display = 'none';
+      }
     } else {
       card.style.display = 'none';
+      indicator.style.display = 'none';
     }
   });
 }
