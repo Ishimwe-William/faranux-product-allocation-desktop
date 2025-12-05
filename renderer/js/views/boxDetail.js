@@ -18,16 +18,6 @@ export function renderBoxDetailView(params = {}) {
     if (box) { found = { shelf, box }; break; }
   }
 
-  // Update breadcrumbs with clickable shelf link
-  const breadcrumbsEl = document.getElementById('breadcrumbs');
-  breadcrumbsEl.innerHTML = `
-    <a href="#/shelf/${found.shelf.id}" style="color: var(--color-text-secondary); text-decoration: none; cursor: pointer;">
-      <span style="color: var(--color-text-secondary);">${found.shelf.name}</span>
-    </a>
-    <span style="margin: 0 8px; color: var(--color-text-secondary)">›</span>
-    <span>${found.box.position}</span>
-  `;
-
   if (!found) {
     container.innerHTML = `
       <div class="empty-state">
@@ -43,6 +33,16 @@ export function renderBoxDetailView(params = {}) {
   const shelf = found.shelf;
   const products = state.products.items || [];
 
+  // Update breadcrumbs with clickable shelf link
+  const breadcrumbsEl = document.getElementById('breadcrumbs');
+  breadcrumbsEl.innerHTML = `
+    <a href="#/shelf/${shelf.id}" style="color: var(--color-text-secondary); text-decoration: none; cursor: pointer;">
+      <span style="color: var(--color-text-secondary);">${shelf.name}</span>
+    </a>
+    <span style="margin: 0 8px; color: var(--color-text-secondary)">›</span>
+    <span>${box.position}</span>
+  `;
+
   // Resolve SKUs to full product objects
   const boxProducts = (box.products || []).map(sku => {
     return products.find(p => p.sku === sku) || { sku, product_name: 'Product not found' };
@@ -50,19 +50,19 @@ export function renderBoxDetailView(params = {}) {
 
   const html = `
     <div class="box-detail-container">
-      <div class="box-detail-header" style="display:flex; justify-content:flex-start; align-items:center; gap:12px; margin-bottom:var(--spacing-lg);">
-        <button class="btn btn-text" onclick="history.back()" style="margin-right:auto;">
+      <div class="box-detail-header">
+        <button class="btn btn-text" onclick="history.back()">
           <span class="material-icons">arrow_back</span>
           Back
         </button>
         <div>
-          <h2 style="margin-bottom:4px;">Box ${box.position}</h2>
+          <h2>Box ${box.position}</h2>
           <div style="font-size:13px; color:var(--color-text-secondary)">Shelf: ${shelf.name} • Branch: ${shelf.branch}</div>
         </div>
       </div>
 
-      <div class="box-detail-content" style="margin-top:var(--spacing-md)">
-        <h3 style="margin-bottom:8px;">Products in this box</h3>
+      <div class="box-detail-content">
+        <h3>Products in this box</h3>
         <div id="box-products-list">
           ${renderProductsList(boxProducts)}
         </div>
@@ -75,22 +75,22 @@ export function renderBoxDetailView(params = {}) {
 
 function renderProductsList(products) {
   if (!products || products.length === 0) {
-    return `<p style="color:var(--color-text-secondary); padding:20px; text-align:center;">No products in this box.</p>`;
+    return `<p>No products in this box.</p>`;
   }
 
-  let out = '<div class="products-list" style="display:flex; flex-direction:column; gap:10px;">';
+  let out = '<div class="products-list">';
   products.forEach(p => {
     const fullName = p.product_name || 'Unnamed product';
     const pname = fullName.length > 25 ? fullName.substring(0, 25) + '...' : fullName;
     const psku = p.sku || '';
     const qty = p.quantity || '';
     out += `
-      <div class="product-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--color-surface); border-radius:6px; border:1px solid var(--color-border);" title="${escapeHtml(fullName)}">
+      <div class="product-item" title="${escapeHtml(fullName)}">
         <div>
-          <div style="font-weight:700">${escapeHtml(pname)}</div>
-          <div style="font-size:12px; color:var(--color-text-secondary)">${psku}</div>
+          <div>${escapeHtml(pname)}</div>
+          <div>${psku}</div>
         </div>
-        <div style="font-size:12px; color:var(--color-text-secondary)">${qty ? 'Qty: ' + qty : ''}</div>
+        <div>${qty ? 'Qty: ' + qty : ''}</div>
       </div>
     `;
   });

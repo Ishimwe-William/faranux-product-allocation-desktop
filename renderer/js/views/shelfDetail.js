@@ -53,7 +53,7 @@ export function renderShelfDetailView(params) {
     <div class="grid-container">
       <div class="grid-header">
         <h3 class="grid-title">Layout</h3>
-        <div style="display:flex; align-items:center; gap:12px;">
+        <div>
           <div class="grid-legend">
             <div class="legend-item">
               <div class="legend-dot" style="background-color: var(--color-primary)"></div>
@@ -70,10 +70,10 @@ export function renderShelfDetailView(params) {
           </div>
 
           <!-- Product search within shelf -->
-          <div style="display:flex; align-items:center; gap:8px; margin-left:16px;">
+          <div style="display:flex; align-items:center; gap:8px;">
             <span class="material-icons">search</span>
-            <input id="shelf-product-search" placeholder="Search product..." style="padding:8px 10px; font-size:14px; border-radius:6px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); min-width:250px;" />
-            <span id="shelf-search-result" style="font-size:13px; color:var(--color-text-secondary); margin-left:8px;"></span>
+            <input id="shelf-product-search" placeholder="Search product..." />
+            <span id="shelf-search-result"></span>
           </div>
         </div>
       </div>

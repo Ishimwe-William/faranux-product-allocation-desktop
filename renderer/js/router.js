@@ -44,8 +44,9 @@ export class Router {
     // 2. Split by slash and filter out empty strings (handles leading slash issues)
     const parts = pathWithoutQuery.split('/').filter(p => p !== '');
 
-    // 3. The first part is the route name (e.g., 'shelves', 'products')
-    const routeName = parts[0];
+    // 3. Build candidate paths: fullPath first, then fallback to first-segment
+    const fullPath = '/' + parts.join('/');
+    const routeName = parts[0] || 'shelves';
     const cleanPath = '/' + routeName;
 
     // 4. If there is a second part, treat it as the ID (e.g., '123' from '/shelf/123')
@@ -54,14 +55,16 @@ export class Router {
       this.params = { ...this.params, id: parts[1] };
     }
 
-    const handler = this.routes[cleanPath];
+    // Prefer exact full-path handlers (supports nested routes like '/settings/display')
+    const handler = this.routes[fullPath] || this.routes[cleanPath];
+    const resolvedRoute = this.routes[fullPath] ? fullPath : cleanPath;
 
     if (handler) {
-      this.currentRoute = cleanPath;
+      this.currentRoute = resolvedRoute;
       await handler(this.params);
       this.updateNavigation();
     } else if (cleanPath !== '/shelves') {
-      console.warn('Route not found:', cleanPath, '- redirecting to /shelves');
+      console.warn('Route not found:', fullPath, '- redirecting to /shelves');
       window.location.hash = '#/shelves';
     }
   }

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 require('dotenv').config();
 
@@ -23,6 +23,25 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
+
+  // Handle navigation to external URLs - open in default browser instead of within Electron
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (!url.startsWith(mainWindow.webContents.getURL())) {
+        event.preventDefault();
+        shell.openExternal(url);
+      }
+    }
+  });
+
+  // Also handle new window requests (right-click > open in new window)
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
 
   // Always open DevTools to see errors
   // mainWindow.webContents.openDevTools();
@@ -71,4 +90,15 @@ ipcMain.handle('get-env', () => {
     DEBUG: process.env.DEBUG === 'true',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info'
   };
+});
+
+// Open external URLs in default browser
+ipcMain.handle('open-external', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening external URL:', error);
+    return { success: false, error: error.message };
+  }
 });

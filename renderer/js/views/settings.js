@@ -1,159 +1,360 @@
 ﻿/* ============================================
-   views/settings.js - Settings View
+   views/settings.js - Modern Card-Based Settings
    ============================================ */
 
 import {store} from '../store.js';
-import {updateSheetId} from '../firebase.js';
-import {showCustomAlert} from '../components/modal.js';
+import {signOut} from '../firebase.js';
+import {fetchProducts, fetchLocations, buildShelves} from '../googleSheets.js';
+import {showCustomAlert, showCustomConfirm} from '../components/modal.js';
 
 export function renderSettingsView() {
-
     const versionPromise = (async () => {
         try {
             if (window.electronAPI && window.electronAPI.getEnv) {
                 const env = await window.electronAPI.getEnv();
                 return env?.APP_VERSION;
             }
-            return 'Unknown';
+            return '1.0.1';
         } catch (e) {
-            console.warn('Failed to load app version:', e);
-            return 'Unknown';
+            return '1.0.1';
         }
     })();
 
     const container = document.getElementById('view-container');
-
-    // 1. Get current state
     const state = store.getState();
-    const currentSheetId = state.config?.sheetId || '';
     const currentUser = state.auth?.user;
-    const lastUpdated = state.config?.lastUpdated
-        ? new Date(state.config.lastUpdated).toLocaleString()
-        : 'Never';
 
-    // Update breadcrumbs
     document.getElementById('breadcrumbs').textContent = 'Settings';
 
-    // Render View
     container.innerHTML = `
-    <div class="settings-view-container">
-      <div class="card">
-        <div class="settings-card-header">
-          <h3 class="settings-card-title">General Configuration</h3>
+    <div class="settings-container">
+      
+      <!-- Profile Section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2 class="settings-section-title">Profile</h2>
         </div>
-        
-        <div class="settings-form-group">
-          <label for="sheet-id-input" class="settings-label">Google Sheet ID</label>
-          <div class="settings-input-wrapper">
-             <input type="text" 
-                   id="sheet-id-input" 
-                   placeholder="Enter your Google Sheet ID" 
-                   class="settings-input-field"
-                   value="${currentSheetId}">
+        <div class="card profile-card">
+          <div class="profile-content">
+            <div class="profile-avatar">
+              <span class="material-icons">account_circle</span>
+            </div>
+            <div class="profile-details">
+              <div class="profile-email" title="${currentUser?.email || 'Not logged in'}">${currentUser?.email || 'Not logged in'}</div>
+              <div class="profile-label">Signed in</div>
+            </div>
+            <button id="settings-logout-btn" class="btn btn-secondary btn-small">
+              <span class="material-icons">logout</span>
+              Logout
+            </button>
           </div>
-          <p class="settings-helper-text">
-            <span class="material-icons settings-helper-icon">info</span>
-            This ID is loaded from Firebase. Changing it will update the app for all users.
-          </p>
-        </div>
-        
-        <div class="settings-actions">
-          <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
         </div>
       </div>
 
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <div class="settings-card-header padded">
-            <h3 class="settings-card-title">Appearance</h3>
+      <!-- Data Management Section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2 class="settings-section-title">Data Management</h2>
+          <p class="settings-section-subtitle">View and sync your inventory data</p>
         </div>
         
-        <div class="settings-row">
-          <div class="settings-row-left">
-            <div class="settings-icon-box">
+        <div class="settings-cards-grid">
+          <!-- Products Card -->
+          <div class="card settings-data-card">
+            <div class="data-card-header">
+              <div class="data-card-icon">
+                <span class="material-icons">inventory_2</span>
+              </div>
+              <button id="sync-products-btn" class="btn-icon-small" title="Sync Products">
+                <span class="material-icons">refresh</span>
+              </button>
+            </div>
+            <div class="data-card-body">
+              <div class="data-card-count" id="products-count">${state.products.items.length}</div>
+              <div class="data-card-label">Products</div>
+              <div class="data-card-time" id="products-last-sync">
+                ${state.products.lastSync ? new Date(state.products.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Never synced'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Shelves Card -->
+          <div class="card settings-data-card">
+            <div class="data-card-header">
+              <div class="data-card-icon">
+                <span class="material-icons">shelves</span>
+              </div>
+              <button id="sync-shelves-btn" class="btn-icon-small" title="Sync Shelves">
+                <span class="material-icons">refresh</span>
+              </button>
+            </div>
+            <div class="data-card-body">
+              <div class="data-card-count" id="shelves-count">${state.shelves.items.length}</div>
+              <div class="data-card-label">Shelves</div>
+              <div class="data-card-time" id="shelves-last-sync">
+                ${state.shelves.lastSync ? new Date(state.shelves.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Never synced'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Full Sync Card -->
+          <div class="card settings-action-card card-clickable" id="full-sync-card">
+            <div class="action-card-icon-wrapper">
+              <span class="material-icons">cloud_sync</span>
+            </div>
+            <div class="action-card-text">
+              <div class="action-card-title">Full Sync</div>
+              <div class="action-card-subtitle">Refresh all data</div>
+            </div>
+            <span class="material-icons action-card-arrow">arrow_forward</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appearance Section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2 class="settings-section-title">Appearance</h2>
+          <p class="settings-section-subtitle">Customize the look and feel</p>
+        </div>
+        <div class="card settings-option-card">
+          <div class="option-card-left">
+            <div class="option-card-icon">
               <span class="material-icons">palette</span>
             </div>
-            <div class="settings-row-info">
-              <h4>App Theme</h4>
-              <p>Choose your preferred visual style</p>
+            <div class="option-card-info">
+              <div class="option-card-title">Theme</div>
+              <div class="option-card-subtitle">Choose your preferred appearance</div>
             </div>
           </div>
-          <div class="settings-row-right">
-            <div class="theme-options" id="theme-options">
-              <label class="theme-option"><input type="radio" name="theme" value="system"> System</label>
-              <label class="theme-option"><input type="radio" name="theme" value="light"> Light</label>
-              <label class="theme-option"><input type="radio" name="theme" value="dark"> Dark</label>
-            </div>
+          <div class="theme-selector" id="theme-options">
+            <label class="theme-radio">
+              <input type="radio" name="theme" value="system">
+              <span class="theme-radio-label">System</span>
+            </label>
+            <label class="theme-radio">
+              <input type="radio" name="theme" value="light">
+              <span class="theme-radio-label">Light</span>
+            </label>
+            <label class="theme-radio">
+              <input type="radio" name="theme" value="dark">
+              <span class="theme-radio-label">Dark</span>
+            </label>
           </div>
         </div>
       </div>
 
-      <div class="card">
-         <div class="settings-card-header">
-            <h3 class="settings-card-title">System Information</h3>
-         </div>
-         <div class="system-info-grid">
-           <div class="system-info-row">
-             <span class="system-label">Current User</span>
-             <span class="system-value mono">${currentUser?.email || 'Not logged in'}</span>
-           </div>
-           <div class="system-info-row">
-             <span class="system-label">Last Config Update</span>
-             <span class="system-value">${lastUpdated}</span>
-           </div>
-           <div class="system-info-row">
-             <span class="system-label">App Version</span>
-             <span class="system-value" id="app-version-display">Loading...</span>
-           </div>
-         </div>
+      <!-- Advanced Section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2 class="settings-section-title">Advanced</h2>
+          <p class="settings-section-subtitle">Configuration and diagnostics</p>
+        </div>
+        <div class="card settings-option-card card-clickable" id="open-diagnostics">
+          <div class="option-card-left">
+            <div class="option-card-icon">
+              <span class="material-icons">settings_suggest</span>
+            </div>
+            <div class="option-card-info">
+              <div class="option-card-title">Diagnostics & Setup</div>
+              <div class="option-card-subtitle">Check connections and configure Sheet ID</div>
+            </div>
+          </div>
+          <span class="material-icons option-card-arrow">chevron_right</span>
+        </div>
       </div>
+
+      <!-- About Section -->
+      <div class="settings-section">
+        <div class="card settings-about-card">
+          <div class="about-icon">
+            <span class="material-icons">info</span>
+          </div>
+          <div class="about-text">
+            <div class="about-version">Inventory Manager v<span id="app-version-display">...</span></div>
+            <div class="about-subtitle">Connected to Google Sheets</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   `;
 
-    // Update version after environment is loaded
     versionPromise.then(version => {
         const versionElement = document.getElementById('app-version-display');
-        if (versionElement) {
-            versionElement.textContent = version;
-        }
+        if (versionElement) versionElement.textContent = version;
     });
 
-    // 2. Setup Event Listeners (Save Button)
-    document.getElementById('save-settings-btn').addEventListener('click', async () => {
-        const input = document.getElementById('sheet-id-input');
-        const btn = document.getElementById('save-settings-btn');
-        const newId = input.value.trim();
+    // Event Listeners
+    const syncProductsBtn = document.getElementById('sync-products-btn');
+    const syncShelvesBtn = document.getElementById('sync-shelves-btn');
+    const fullSyncCard = document.getElementById('full-sync-card');
+    const logoutBtn = document.getElementById('settings-logout-btn');
+    const diagnosticsCard = document.getElementById('open-diagnostics');
 
-        // Validation
-        if (!newId) {
-            await showCustomAlert('Validation Error', 'Please enter a valid Google Sheet ID.', 'error');
-            return;
-        }
+    if (syncProductsBtn) syncProductsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        syncProducts();
+    });
+    if (syncShelvesBtn) syncShelvesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        syncShelves();
+    });
+    if (fullSyncCard) fullSyncCard.addEventListener('click', fullSync);
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    if (diagnosticsCard) diagnosticsCard.addEventListener('click', () => {
+        window.location.hash = '#/settings/diagnostics';
+    });
 
-        if (!currentUser) {
-            await showCustomAlert('Authentication Error', 'You must be logged in to change settings.', 'error');
-            return;
+    // Theme handling
+    const currentTheme = state.display?.theme || 'system';
+    const themeOptions = document.getElementById('theme-options');
+    if (themeOptions) {
+        const radios = themeOptions.querySelectorAll('input[name="theme"]');
+        radios.forEach(r => {
+            r.checked = (r.value === currentTheme);
+            r.addEventListener('change', (e) => {
+                const v = e.target.value;
+                store.setDisplaySettings({theme: v});
+                applyTheme(v);
+            });
+        });
+    }
+
+    async function syncProducts() {
+        if (!syncProductsBtn) return;
+        try {
+            const icon = syncProductsBtn.querySelector('.material-icons');
+            icon.style.animation = 'spin 0.8s linear infinite';
+            syncProductsBtn.disabled = true;
+            store.setProductsLoading(true);
+
+            const [products, locations] = await Promise.all([fetchProducts(), fetchLocations()]);
+            store.setProducts(products, locations);
+            const shelves = buildShelves(locations);
+            store.setShelves(shelves);
+
+            const prodCount = document.getElementById('products-count');
+            const prodLast = document.getElementById('products-last-sync');
+            if (prodCount) prodCount.textContent = (products || []).length;
+            if (prodLast) {
+                const time = new Date(store.getState().products.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                prodLast.textContent = time;
+            }
+
+            await showCustomAlert('Success', 'Products synced successfully.', 'success');
+        } catch (error) {
+            console.error('Sync products failed:', error);
+            await showCustomAlert('Sync Failed', String(error.message || error), 'error');
+        } finally {
+            if (syncProductsBtn) {
+                const icon = syncProductsBtn.querySelector('.material-icons');
+                icon.style.animation = '';
+                syncProductsBtn.disabled = false;
+            }
+            store.setProductsLoading(false);
         }
+    }
+
+    async function syncShelves() {
+        if (!syncShelvesBtn) return;
+        try {
+            const icon = syncShelvesBtn.querySelector('.material-icons');
+            icon.style.animation = 'spin 0.8s linear infinite';
+            syncShelvesBtn.disabled = true;
+            store.setShelvesLoading(true);
+
+            const locations = await fetchLocations();
+            const shelves = buildShelves(locations);
+            store.setShelves(shelves);
+
+            const shelCount = document.getElementById('shelves-count');
+            const shelLast = document.getElementById('shelves-last-sync');
+            if (shelCount) shelCount.textContent = (shelves || []).length;
+            if (shelLast) {
+                const time = new Date(store.getState().shelves.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                shelLast.textContent = time;
+            }
+
+            await showCustomAlert('Success', 'Shelves synced successfully.', 'success');
+        } catch (error) {
+            console.error('Sync shelves failed:', error);
+            await showCustomAlert('Sync Failed', String(error.message || error), 'error');
+        } finally {
+            if (syncShelvesBtn) {
+                const icon = syncShelvesBtn.querySelector('.material-icons');
+                icon.style.animation = '';
+                syncShelvesBtn.disabled = false;
+            }
+            store.setShelvesLoading(false);
+        }
+    }
+
+    async function fullSync() {
+        const ok = await showCustomConfirm('Sync All Data', 'Reload all products and shelves?', 'warning');
+        if (!ok) return;
+
+        const card = document.getElementById('full-sync-card');
+        const originalContent = card.innerHTML;
 
         try {
-            btn.textContent = 'Saving...';
-            btn.disabled = true;
+            card.innerHTML = `
+                <div class="action-card-icon-wrapper">
+                    <span class="material-icons" style="animation: spin 0.8s linear infinite;">hourglass_empty</span>
+                </div>
+                <div class="action-card-text">
+                    <div class="action-card-title">Syncing...</div>
+                </div>
+            `;
+            card.style.pointerEvents = 'none';
 
-            await updateSheetId(newId, currentUser.email);
-            await showCustomAlert('Success', 'Settings saved successfully! The sheet ID has been updated.', 'success');
+            store.setProductsLoading(true);
+            store.setShelvesLoading(true);
+
+            const [products, locations] = await Promise.all([fetchProducts(), fetchLocations()]);
+            store.setProducts(products, locations);
+            const shelves = buildShelves(locations);
+            store.setShelves(shelves);
+
+            const prodCount = document.getElementById('products-count');
+            const prodLast = document.getElementById('products-last-sync');
+            const shelCount = document.getElementById('shelves-count');
+            const shelLast = document.getElementById('shelves-last-sync');
+
+            if (prodCount) prodCount.textContent = (products || []).length;
+            if (shelCount) shelCount.textContent = (shelves || []).length;
+            if (prodLast) {
+                const time = new Date(store.getState().products.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                prodLast.textContent = time;
+            }
+            if (shelLast) {
+                const time = new Date(store.getState().shelves.lastSync).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                shelLast.textContent = time;
+            }
+
+            await showCustomAlert('Success', 'All data synced successfully.', 'success');
         } catch (error) {
-            console.error('Failed to save settings:', error);
-            await showCustomAlert('Save Failed', 'Error saving settings: ' + error.message, 'error');
+            console.error('Full sync failed:', error);
+            await showCustomAlert('Sync Failed', String(error.message || error), 'error');
         } finally {
-            btn.textContent = 'Save Settings';
-            btn.disabled = false;
+            card.innerHTML = originalContent;
+            card.style.pointerEvents = '';
+            store.setProductsLoading(false);
+            store.setShelvesLoading(false);
         }
-    });
+    }
 
-    // 3. Setup Theme Handling
-    const themeOptions = document.getElementById('theme-options');
-    const currentTheme = state.display?.theme || 'system';
+    async function handleLogout() {
+        const confirmed = await showCustomConfirm('Logout', 'Are you sure you want to logout?', 'warning');
+        if (!confirmed) return;
+        try {
+            await signOut();
+        } catch (err) {
+            console.error('Logout failed:', err);
+            await showCustomAlert('Logout Failed', String(err.message || err), 'error');
+        }
+    }
 
-    // Helper to apply theme classes
     function applyTheme(theme) {
         const htmlEl = document.documentElement;
         const body = document.body;
@@ -174,21 +375,4 @@ export function renderSettingsView() {
             htmlEl.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
         }
     }
-
-    // Bind radio buttons
-    try {
-        const radios = themeOptions.querySelectorAll('input[name="theme"]');
-        radios.forEach(r => {
-            r.checked = (r.value === currentTheme);
-            r.addEventListener('change', (e) => {
-                const v = e.target.value;
-                store.setDisplaySettings({theme: v});
-                applyTheme(v);
-            });
-        });
-    } catch (err) {
-        // no-op if elements missing
-    }
-
-    applyTheme(currentTheme);
 }

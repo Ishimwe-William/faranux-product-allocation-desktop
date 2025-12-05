@@ -24,7 +24,7 @@ import { renderShelfDetailView } from './views/shelfDetail.js';
 import { renderBoxDetailView } from './views/boxDetail.js';
 import { renderProductsView } from './views/products.js';
 import { renderSettingsView } from './views/settings.js';
-import { renderDisplaySettingsView } from './views/displaySettings.js';
+// import { renderDisplaySettingsView } from './views/displaySettings.js';
 import { renderDiagnosticsView } from './views/diagnostics.js';
 import { setupAuthHandlers as initAuthHandlers, showAuthScreen, hideAuthScreen, resetAuthForm, updateUserDisplay } from './views/auth.js';
 
@@ -173,7 +173,7 @@ function registerRoutes() {
   router.register('/box', renderBoxDetailView);
   router.register('/products', renderProductsView);
   router.register('/settings', renderSettingsView);
-  router.register('/settings/display', renderDisplaySettingsView);
+  // router.register('/settings/display', renderDisplaySettingsView);
   router.register('/settings/diagnostics', renderDiagnosticsView);
 }
 

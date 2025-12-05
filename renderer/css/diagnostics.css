@@ -1,0 +1,308 @@
+/* ============================================
+   diagnostics.css - Modern Card-Based Diagnostics
+   ============================================ */
+
+.diagnostics-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.diagnostics-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.diagnostics-section-header {
+  margin-bottom: var(--spacing-xs);
+}
+
+.diagnostics-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.diagnostics-section-subtitle {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Diagnostic Stat Cards Grid */
+.diagnostics-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.diagnostic-stat-card {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  transition: all var(--transition-fast);
+}
+
+.diagnostic-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-light);
+}
+
+.diagnostic-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diagnostic-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+/* Sheet Configuration Card */
+.diagnostics-sheet-card {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sheet-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.sheet-card-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--color-primary-rgb), 0.12);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.sheet-card-icon .material-icons {
+  font-size: 22px;
+  color: var(--color-primary);
+}
+
+.sheet-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.sheet-card-id {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  font-weight: 500;
+  word-break: break-all;
+  line-height: 1.5;
+  background: var(--color-background);
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.sheet-card-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.sheet-card-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--spacing-sm) 0;
+}
+
+/* Test Connection Card */
+.diagnostics-test-card {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.test-card-content {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+#diag-test-result {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: var(--spacing-sm);
+}
+
+.test-result-pending {
+  background: rgba(var(--color-primary-rgb), 0.08);
+  border: 1px solid rgba(var(--color-primary-rgb), 0.2);
+  color: var(--color-primary);
+}
+
+.test-result-success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--color-success);
+}
+
+.test-result-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--color-error);
+}
+
+.test-result-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.test-result-header .material-icons {
+  font-size: 18px;
+}
+
+.test-result-body {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.test-result-sheets {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.test-result-sheets ul {
+  margin: var(--spacing-xs) 0 0 var(--spacing-md);
+  padding: 0;
+  list-style: disc;
+}
+
+.test-result-sheets li {
+  padding: 2px 0;
+  color: var(--color-text);
+}
+
+/* Config Card */
+.diagnostics-config-card {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.config-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.config-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.config-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.config-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: 14px;
+  font-family: var(--font-mono);
+  transition: all var(--transition-fast);
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08);
+}
+
+.config-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.config-hint .material-icons {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .diagnostics-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sheet-card-actions {
+    flex-direction: column;
+  }
+
+  .sheet-card-actions .btn {
+    width: 100%;
+  }
+
+  .test-card-content {
+    justify-content: stretch;
+  }
+
+  .test-card-content .btn {
+    width: 100%;
+  }
+
+  .config-actions {
+    justify-content: stretch;
+  }
+
+  .config-actions .btn {
+    width: 100%;
+  }
+}

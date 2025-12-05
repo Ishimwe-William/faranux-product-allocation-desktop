@@ -1,71 +1,18 @@
-/* Sidebar intentionally uses global variables defined in `variables.css`.
-   This file should not redefine color variables so theming applies consistently */
 /* ============================================
-   sidebar.css - Sidebar Navigation
+   sidebar.css - Modern Sidebar Navigation
    ============================================ */
 
 .sidebar {
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   transition: width var(--transition-base);
-  overflow-x: hidden; /* Prevent content from spilling during transition */
-  white-space: nowrap; /* Prevent text wrapping during transition */
+  overflow-x: hidden;
+  white-space: nowrap;
 }
-
-/* ============================================
-   Collapsed State Logic
-   ============================================ */
-
-/* 1. Shrink width */
-.app-container.sidebar-collapsed .sidebar {
-  width: var(--collapsed-sidebar-width);
-}
-
-/* 2. Hide text elements (Nav labels, User details, Header title, Logout text) */
-.app-container.sidebar-collapsed .sidebar .nav-item span:not(.material-icons),
-.app-container.sidebar-collapsed .sidebar .user-details,
-.app-container.sidebar-collapsed .sidebar .sidebar-header h2,
-.app-container.sidebar-collapsed .sidebar #logout-btn span:not(.material-icons) {
-  display: none;
-}
-
-/* 3. Center Navigation Items */
-.app-container.sidebar-collapsed .sidebar .nav-item {
-  justify-content: center;
-  padding: 12px;
-}
-
-/* 4. Center Footer/Logout Items */
-.app-container.sidebar-collapsed .sidebar .sidebar-footer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 0;
-}
-
-.app-container.sidebar-collapsed .sidebar .user-info {
-  justify-content: center;
-  padding: 0;
-  margin-bottom: 8px;
-}
-
-.app-container.sidebar-collapsed .sidebar .user-info .material-icons {
-  margin: 0;
-}
-
-.app-container.sidebar-collapsed .sidebar #logout-btn {
-  justify-content: center;
-  padding: 8px;
-  width: 40px; /* Force square ratio for icon */
-}
-
-/* ============================================
-   Standard Styles
-   ============================================ */
 
 .sidebar-header {
   height: var(--topbar-height);
@@ -76,21 +23,14 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.sidebar-header #sidebar-toggle-btn {
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-
-.sidebar-header .material-icons {
-  font-size: 28px;
-  color: var(--color-primary);
-  flex-shrink: 0;
-}
-
 .sidebar-header h2 {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   margin: 0;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .sidebar-nav {
@@ -104,38 +44,34 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 12px var(--spacing-md);
+  padding: 10px var(--spacing-md);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
-  transition: all var(--transition-base);
-  margin-bottom: var(--spacing-xs);
-  text-decoration: none; /* Ensure no underline on links */
-}
-
-.nav-item .material-icons {
-  font-size: 22px;
-  flex-shrink: 0; /* Stop icon from squishing */
-}
-
-.nav-item span:not(.material-icons) {
+  transition: all var(--transition-fast);
+  margin-bottom: 4px;
+  text-decoration: none;
   font-size: 14px;
   font-weight: 500;
 }
 
+.nav-item .material-icons {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
 .nav-item:hover {
-  background-color: var(--color-surface-variant);
+  background: var(--color-surface-variant);
   color: var(--color-text);
 }
 
 .nav-item.active {
-  background-color: rgba(25, 118, 210, 0.1);
+  background: rgba(var(--color-primary-rgb), 0.12);
   color: var(--color-primary);
 }
 
 .sidebar-footer {
   padding: var(--spacing-md);
   border-top: 1px solid var(--color-border);
-  /*margin-bottom: var(--spacing-md);*/
 }
 
 .user-info {
@@ -144,11 +80,17 @@
   gap: var(--spacing-sm);
   padding: var(--spacing-sm);
   margin-bottom: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.user-info:hover {
+  background: var(--color-surface-variant);
 }
 
 .user-info .material-icons {
-  font-size: 32px;
-  color: var(--color-text-secondary);
+  font-size: 28px;
+  color: var(--color-primary);
   flex-shrink: 0;
 }
 
@@ -164,12 +106,52 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
-/* Ensure logout button aligns with other items */
 #logout-btn {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm); /* Matches nav-item gap */
+  gap: var(--spacing-sm);
   width: 100%;
+}
+
+/* Collapsed State */
+.app-container.sidebar-collapsed .sidebar {
+  width: var(--collapsed-sidebar-width);
+}
+
+.app-container.sidebar-collapsed .sidebar-header h2,
+.app-container.sidebar-collapsed .nav-item span:not(.material-icons),
+.app-container.sidebar-collapsed .user-details,
+.app-container.sidebar-collapsed #logout-btn span:not(.material-icons) {
+  display: none;
+}
+
+.app-container.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 10px;
+}
+
+.app-container.sidebar-collapsed .sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.app-container.sidebar-collapsed .user-info {
+  justify-content: center;
+  padding: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.app-container.sidebar-collapsed .user-info .material-icons {
+  margin: 0;
+}
+
+.app-container.sidebar-collapsed #logout-btn {
+  justify-content: center;
+  padding: 10px;
+  width: 48px;
 }
