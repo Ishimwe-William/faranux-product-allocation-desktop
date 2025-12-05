@@ -236,7 +236,8 @@ export function renderDiagnosticsView() {
             <span class="material-icons">error</span>
             <span>Connection Failed</span>
           </div>
-          <div class="test-result-body">${result.error || 'Unknown error occurred'}</div>
+          <div class="test-result-body">${result.error?.toString().includes('This operation is not supported')
+            ? 'Not enough permission. Ensure the document is not restricted to viewing by anyone other than the owner.' : 'Unknown error occurred'}</div>
         `;
       }
     } catch (err) {
