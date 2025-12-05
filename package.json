@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron . --debug",
-    "dist": "electron-builder",
+    "dist": "electron-builder --win",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -20,7 +20,14 @@
   "build": {
     "appId": "com.bunsenplus.fxproductallocation",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "buildResources/icon.ico"
+    },
+    "mac": {
+      "icon": "buildResources/icon.icns"
+    },
+    "linux": {
+      "icon": "buildResources/icon.png"
     },
     "directories": {
       "output": "dist"
@@ -41,6 +48,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron/fuses": "^1.8.0",
-    "electron": "^36.0.1"
+    "electron": "^36.0.1",
+    "electron-builder": "^26.0.12"
   }
 }
