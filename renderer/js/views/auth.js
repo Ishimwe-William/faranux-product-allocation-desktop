@@ -44,7 +44,7 @@ export function setupAuthHandlers() {
       toggleBtn.textContent = 'Already have an account? Sign In';
       if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'block';
       if (authSubtitle) authSubtitle.textContent = 'Create a new account';
-      if (googleBtn) googleBtn.style.display = 'none';
+      if (googleBtn) googleBtn.style.display = 'flex';
     }
 
     // Clear form
@@ -65,16 +65,15 @@ export function setupAuthHandlers() {
       const originalText = googleBtn.innerHTML;
       googleBtn.disabled = true;
       googleBtn.innerHTML = 'Signing in...';
-
       try {
         await signInWithGoogle();
         // App.js listener handles the redirect
       } catch (error) {
         showError(error.message);
-        googleBtn.disabled = false;
-        googleBtn.innerHTML = originalText;
       } finally {
         isSubmitting = false;
+        googleBtn.innerHTML = originalText;
+        googleBtn.disabled = false;
       }
     });
   }
