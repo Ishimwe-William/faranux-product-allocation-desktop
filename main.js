@@ -88,7 +88,7 @@ async function createWindow() {
   // CHANGE: Load from localhost instead of file://
   await mainWindow.loadURL(`http://127.0.0.1:${port}`);
 
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   // Handle navigation to external URLs (open in browser)
   mainWindow.webContents.on('will-navigate', (event, url) => {
