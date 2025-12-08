@@ -2,7 +2,7 @@
    googleSheets.js - Google Sheets API with Flexible Column Mapping
    ============================================ */
 
-import { store } from './store.js';
+import {store} from './store.js';
 
 // Initialize env vars (Fallback only)
 let GSHEETS_API_KEY = null;
@@ -25,30 +25,29 @@ const envPromise = (async () => {
 
 const GSHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
-// ---------------------------------------------------------
-// Column Mapping - Define all possible variations
-// ---------------------------------------------------------
+// Helper: Get Auth Headers if Google Token exists
+function getAuthHeaders() {
+    const state = store.getState();
+    const token = state.auth?.googleAccessToken;
 
+    // If we have a Google Token, use Bearer Auth (works for restricted sheets)
+    if (token) {
+        return {
+            'Authorization': `Bearer ${token}`
+        };
+    }
+    // If no token, return empty object (will rely on API Key in URL)
+    return {};
+}
+
+// ... [Keep COLUMN_MAPPINGS, normalizeHeader, mapHeaders, getFieldValue as they were] ...
 const COLUMN_MAPPINGS = {
-    // Product name variations
     product_name: ['product_name', 'item', 'name', 'product', 'item_name', 'product name', 'item name'],
-
-    // SKU variations (prioritized - checked first)
     sku: ['sku', 'item_code', 'product_code', 'item code', 'product code', 'part_number', 'part number'],
-
-    // Serial number (row number, index) - lower priority
     serial_number: ['s/n', 'sn', 'serial', 'no', 'number', '#', 'index'],
-
-    // Quantity variations
     quantity: ['quantity', 'qty', 'stock', 'amount', 'count', 'inv', 'inventory'],
-
-    // Category variations
     category: ['category', 'type', 'group', 'class', 'classification'],
-
-    // Description variations
     description: ['description', 'desc', 'details', 'notes', 'info'],
-
-    // Location fields
     branch: ['branch', 'location', 'store', 'warehouse', 'site'],
     shelf: ['shelf', 'rack', 'shelves', 'shelf_number', 'shelf number'],
     row: ['row', 'level', 'tier'],
@@ -56,114 +55,60 @@ const COLUMN_MAPPINGS = {
     box: ['box', 'bin', 'container', 'unit']
 };
 
-/**
- * Normalize a header string for matching
- */
 function normalizeHeader(header) {
     if (!header) return '';
-    return String(header)
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
+    return String(header).toLowerCase().trim().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 }
 
-/**
- * Map actual column headers to standardized field names
- * Priority system: SKU field takes precedence over S/N when both exist
- */
 function mapHeaders(rawHeaders) {
     const headerMap = {};
-    const normalizedHeaders = rawHeaders.map(h => ({
-        original: h,
-        normalized: normalizeHeader(h)
-    }));
-
-    // First pass: Find SKU field (highest priority for unique identifier)
+    const normalizedHeaders = rawHeaders.map(h => ({ original: h, normalized: normalizeHeader(h) }));
     const skuVariations = COLUMN_MAPPINGS.sku;
     for (const variation of skuVariations) {
         const normalizedVariation = normalizeHeader(variation);
         const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
-
-        if (match) {
-            headerMap.sku = match.original;
-            break;
-        }
+        if (match) { headerMap.sku = match.original; break; }
     }
-
-    // Second pass: Map all other fields (excluding sku and serial_number for now)
     Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
-        if (standardField === 'sku' || standardField === 'serial_number') return; // Skip, handled separately
-
+        if (standardField === 'sku' || standardField === 'serial_number') return;
         const variations = COLUMN_MAPPINGS[standardField];
-
         for (const variation of variations) {
             const normalizedVariation = normalizeHeader(variation);
             const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
-
-            if (match) {
-                headerMap[standardField] = match.original;
-                break;
-            }
+            if (match) { headerMap[standardField] = match.original; break; }
         }
     });
-
-    // Third pass: If no SKU found, try serial_number as fallback
     if (!headerMap.sku) {
         const serialVariations = COLUMN_MAPPINGS.serial_number;
         for (const variation of serialVariations) {
             const normalizedVariation = normalizeHeader(variation);
             const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
-
-            if (match) {
-                headerMap.sku = match.original; // Map serial_number to sku field
-                console.warn('[GoogleSheets] No SKU column found. Using S/N column as identifier.');
-                break;
-            }
+            if (match) { headerMap.sku = match.original; console.warn('[GoogleSheets] No SKU column found. Using S/N column as identifier.'); break; }
         }
     }
-
-    console.log('[GoogleSheets] Header mapping:', headerMap);
     return headerMap;
 }
 
-/**
- * Extract value from row using header mapping
- */
 function getFieldValue(row, headers, headerMap, standardField) {
     const actualHeader = headerMap[standardField];
     if (!actualHeader) return '';
-
     const headerIndex = headers.indexOf(actualHeader);
     if (headerIndex === -1) return '';
-
     return row[headerIndex] ? String(row[headerIndex]).trim() : '';
 }
-
-// ---------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------
 
 function getCurrentSheetId() {
     if (store) {
         const state = store.getState();
-        const dynamicId = state.config?.sheetId;
-        if (dynamicId) return dynamicId;
+        return state.config?.sheetId || GSHEET_ID || null;
     }
     return GSHEET_ID || null;
 }
 
 function extractFileId(input) {
     if (!input) return '';
-    if (!input.includes('drive.google.com') && !input.includes('docs.google.com')) {
-        return input;
-    }
-    const patterns = [
-        /\/file\/d\/([a-zA-Z0-9_-]+)/,
-        /id=([a-zA-Z0-9_-]+)/,
-        /\/d\/([a-zA-Z0-9_-]+)/
-    ];
+    if (!input.includes('drive.google.com') && !input.includes('docs.google.com')) return input;
+    const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /id=([a-zA-Z0-9_-]+)/, /\/d\/([a-zA-Z0-9_-]+)/];
     for (const pattern of patterns) {
         const match = input.match(pattern);
         if (match) return match[1];
@@ -174,8 +119,7 @@ function extractFileId(input) {
 function detectSourceType(source) {
     if (!source) return null;
     if (source.includes('drive.google.com') || source.includes('docs.google.com')) {
-        if (source.includes('spreadsheets')) return 'google_sheet';
-        return 'excel_file';
+        return source.includes('spreadsheets') ? 'google_sheet' : 'excel_file';
     }
     if (source.endsWith('.xlsx') || source.endsWith('.xls')) return 'excel_file';
     return 'google_sheet';
@@ -185,7 +129,8 @@ async function getFileMimeType(fileId) {
     await envPromise;
     try {
         const url = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType&key=${GSHEETS_API_KEY}`;
-        const response = await fetch(url);
+        // Add headers here too
+        const response = await fetch(url, { headers: getAuthHeaders() });
         if (response.ok) {
             const data = await response.json();
             return data.mimeType;
@@ -196,17 +141,15 @@ async function getFileMimeType(fileId) {
     return null;
 }
 
-// ---------------------------------------------------------
-// Core Fetchers
-// ---------------------------------------------------------
-
 async function fetchExcelFromDrive(fileId) {
     await envPromise;
     try {
         const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${GSHEETS_API_KEY}`;
-        let response = await fetch(driveUrl);
+        // Add headers for Drive download
+        let response = await fetch(driveUrl, { headers: getAuthHeaders() });
 
         if (!response.ok) {
+            // Fallback for public files (often don't need token, but it doesn't hurt usually)
             const publicUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
             response = await fetch(publicUrl);
         }
@@ -224,30 +167,21 @@ async function fetchExcelFromDrive(fileId) {
     }
 }
 
-// ---------------------------------------------------------
-// Parsers with Flexible Column Mapping
-// ---------------------------------------------------------
-
+// ... [Keep parseProductsFromExcel, parseLocationsFromExcel, parseLocationsFromProducts] ...
 function parseProductsFromExcel(workbook) {
     let sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('product')) || workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
     if (rawData.length === 0) return [];
-
     const rawHeaders = rawData[0];
     const headerMap = mapHeaders(rawHeaders);
-
     return rawData.slice(1).map(row => {
         const product = {};
-
-        // Map each standard field
         Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
-            const value = getFieldValue(row, rawHeaders, headerMap, standardField);
-            product[standardField] = value;
+            product[standardField] = getFieldValue(row, rawHeaders, headerMap, standardField);
         });
-
         return product;
-    }).filter(p => p.sku); // Only include rows with SKU
+    }).filter(p => p.sku);
 }
 
 function parseLocationsFromExcel(workbook) {
@@ -256,22 +190,16 @@ function parseLocationsFromExcel(workbook) {
         const products = parseProductsFromExcel(workbook);
         return parseLocationsFromProducts(products);
     }
-
     const worksheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
     if (rawData.length === 0) return [];
-
     const rawHeaders = rawData[0];
     const headerMap = mapHeaders(rawHeaders);
-
     return rawData.slice(1).map(row => {
         const location = {};
-
-        // Map location fields
         ['sku', 'branch', 'shelf', 'row', 'column', 'box'].forEach(field => {
             location[field] = getFieldValue(row, rawHeaders, headerMap, field);
         });
-
         return location;
     }).filter(l => l.sku && l.branch && l.shelf);
 }
@@ -293,9 +221,7 @@ function parseLocationsFromProducts(products) {
     return locations;
 }
 
-// ---------------------------------------------------------
-// Main Exported Functions
-// ---------------------------------------------------------
+// Exported Functions Updated with Headers
 
 export async function testSheetConnection(sheetId = null) {
     await envPromise;
@@ -322,7 +248,8 @@ export async function testSheetConnection(sheetId = null) {
         }
 
         const url = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        const response = await fetch(url);
+        // UPDATED: Use headers
+        const response = await fetch(url, { headers: getAuthHeaders() });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || 'Failed to fetch sheet');
 
@@ -362,7 +289,8 @@ export async function fetchProducts(sheetId = null) {
 
         // Google Sheets Logic
         const metaUrl = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        const metaResponse = await fetch(metaUrl);
+        // UPDATED
+        const metaResponse = await fetch(metaUrl, { headers: getAuthHeaders() });
         const metaData = await metaResponse.json();
         if (!metaResponse.ok) throw new Error(metaData.error?.message || 'Failed to fetch sheet metadata');
 
@@ -371,7 +299,8 @@ export async function fetchProducts(sheetId = null) {
         const sheetName = productsSheet.properties?.title || 'Sheet1';
 
         const valuesUrl = `${GSHEETS_API_BASE}/${id}/values/${encodeURIComponent(sheetName)}?key=${GSHEETS_API_KEY}`;
-        const valuesResponse = await fetch(valuesUrl);
+        // UPDATED
+        const valuesResponse = await fetch(valuesUrl, { headers: getAuthHeaders() });
         const valuesData = await valuesResponse.json();
         const rows = valuesData.values || [];
 
@@ -382,13 +311,9 @@ export async function fetchProducts(sheetId = null) {
 
         return rows.slice(1).map(row => {
             const product = {};
-
-            // Map each standard field
             Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
-                const value = getFieldValue(row, rawHeaders, headerMap, standardField);
-                product[standardField] = value;
+                product[standardField] = getFieldValue(row, rawHeaders, headerMap, standardField);
             });
-
             return product;
         }).filter(p => p.sku);
     } catch (error) {
@@ -417,7 +342,8 @@ export async function fetchLocations(sheetId = null) {
 
         // 2. Google Sheets Logic
         const metaUrl = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        const metaResponse = await fetch(metaUrl);
+        // UPDATED
+        const metaResponse = await fetch(metaUrl, { headers: getAuthHeaders() });
         const metaData = await metaResponse.json();
 
         if (!metaResponse.ok) throw new Error('Failed to fetch sheet metadata');
@@ -436,7 +362,8 @@ export async function fetchLocations(sheetId = null) {
         const sheetName = locationsSheet.properties?.title;
 
         const valuesUrl = `${GSHEETS_API_BASE}/${id}/values/${encodeURIComponent(sheetName)}?key=${GSHEETS_API_KEY}`;
-        const valuesResponse = await fetch(valuesUrl);
+        // UPDATED
+        const valuesResponse = await fetch(valuesUrl, { headers: getAuthHeaders() });
         const valuesData = await valuesResponse.json();
         const rows = valuesData.values || [];
 
@@ -445,18 +372,13 @@ export async function fetchLocations(sheetId = null) {
         const rawHeaders = rows[0];
         const headerMap = mapHeaders(rawHeaders);
 
-        const locations = rows.slice(1).map(row => {
+        return rows.slice(1).map(row => {
             const location = {};
-
-            // Map location fields
             ['sku', 'branch', 'shelf', 'row', 'column', 'box'].forEach(field => {
                 location[field] = getFieldValue(row, rawHeaders, headerMap, field);
             });
-
             return location;
         }).filter(l => l.sku && l.branch && l.shelf);
-
-        return locations;
 
     } catch (error) {
         console.error('Error fetching locations:', error);
@@ -464,6 +386,7 @@ export async function fetchLocations(sheetId = null) {
     }
 }
 
+// ... [Keep buildShelves, searchProducts, findProductLocations as they were] ...
 export function buildShelves(locations) {
     const shelvesMap = new Map();
     locations.forEach(location => {
@@ -487,7 +410,6 @@ export function buildShelves(locations) {
                 maxColumn: 0
             });
         }
-
         const shelfData = shelvesMap.get(shelfKey);
         if (row) {
             const rowNum = parseInt(row);
@@ -497,7 +419,6 @@ export function buildShelves(locations) {
             const colNum = column.charCodeAt(0) - 64;
             if (colNum > 0) shelfData.maxColumn = Math.max(shelfData.maxColumn, colNum);
         }
-
         const position = row && column ? `${row}${column}` : location.box || 'unknown';
         const boxKey = `${shelfKey}-${position}`;
         if (!shelfData.boxes.has(boxKey)) {

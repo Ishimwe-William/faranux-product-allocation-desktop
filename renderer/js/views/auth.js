@@ -1,8 +1,8 @@
 /* ============================================
-   views/auth.js - Authentication View
+   views/auth.js - Authentication View (UPDATED)
    ============================================ */
 
-import { signIn, signUp } from '../firebase.js';
+import { signIn, signUp, signInWithGoogle } from '../firebase.js'; // ✅ UPDATED: Imported signInWithGoogle
 
 let isLogin = true;
 let isSubmitting = false;
@@ -13,15 +13,16 @@ let isSubmitting = false;
 export function setupAuthHandlers() {
   const toggleBtn = document.getElementById('auth-toggle-btn');
   const submitBtn = document.getElementById('auth-submit-btn');
+  const googleBtn = document.getElementById('google-auth-btn'); // ✅ NEW
   const confirmPasswordGroup = document.getElementById('confirm-password-group');
   const authForm = document.getElementById('auth-form');
   const authError = document.getElementById('auth-error');
   const emailInput = document.getElementById('email');
   const passwordInput = document.getElementById('password');
   const confirmPasswordInput = document.getElementById('confirmPassword');
-  const authSubtitle = document.getElementById('auth-subtitle');
+  const authSubtitle = document.querySelector('.auth-subtitle');
 
-  // Safety check - if elements don't exist, exit early
+  // Safety check
   if (!toggleBtn || !submitBtn || !authForm) {
     console.error('[Auth] Required form elements not found in DOM');
     return;
@@ -37,11 +38,13 @@ export function setupAuthHandlers() {
       toggleBtn.textContent = "Don't have an account? Sign Up";
       if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'none';
       if (authSubtitle) authSubtitle.textContent = 'Sign in to continue';
+      if (googleBtn) googleBtn.style.display = 'flex';
     } else {
       submitBtn.textContent = 'Sign Up';
       toggleBtn.textContent = 'Already have an account? Sign In';
       if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'block';
       if (authSubtitle) authSubtitle.textContent = 'Create a new account';
+      if (googleBtn) googleBtn.style.display = 'none';
     }
 
     // Clear form
@@ -49,29 +52,46 @@ export function setupAuthHandlers() {
     if (emailInput) emailInput.focus();
   });
 
-  // Handle form submission
+  // Handle standard form submission
   authForm.addEventListener('submit', handleAuthSubmit);
+
+  // ✅ NEW: Handle Google Sign In
+  if (googleBtn) {
+    googleBtn.addEventListener('click', async () => {
+      if (isSubmitting) return;
+      isSubmitting = true;
+      clearErrors();
+
+      const originalText = googleBtn.innerHTML;
+      googleBtn.disabled = true;
+      googleBtn.innerHTML = 'Signing in...';
+
+      try {
+        await signInWithGoogle();
+        // App.js listener handles the redirect
+      } catch (error) {
+        showError(error.message);
+        googleBtn.disabled = false;
+        googleBtn.innerHTML = originalText;
+      } finally {
+        isSubmitting = false;
+      }
+    });
+  }
 
   // Clear error on input
   if (emailInput) {
     emailInput.addEventListener('input', () => {
-      if (authError && authError.style.display !== 'none') {
-        clearErrors();
-      }
+      if (authError && authError.style.display !== 'none') clearErrors();
     });
   }
 
   if (passwordInput) {
     passwordInput.addEventListener('input', () => {
-      if (authError && authError.style.display !== 'none') {
-        clearErrors();
-      }
+      if (authError && authError.style.display !== 'none') clearErrors();
     });
   }
 
-  /**
-   * Handle authentication form submission
-   */
   async function handleAuthSubmit(e) {
     e.preventDefault();
 
@@ -84,84 +104,37 @@ export function setupAuthHandlers() {
     const confirmPassword = confirmPasswordInput?.value || '';
 
     // Validation
-    if (!email) {
-      showError('Please enter your email address');
-      if (emailInput) emailInput.focus();
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      showError('Please enter a valid email address');
-      if (emailInput) emailInput.focus();
-      return;
-    }
-
-    if (!password) {
-      showError('Please enter a password');
-      if (passwordInput) passwordInput.focus();
-      return;
-    }
-
-    if (password.length < 6) {
-      showError('Password must be at least 6 characters long');
-      if (passwordInput) passwordInput.focus();
-      return;
-    }
+    if (!email) { showError('Please enter your email address'); if(emailInput) emailInput.focus(); return; }
+    if (!isValidEmail(email)) { showError('Please enter a valid email address'); if(emailInput) emailInput.focus(); return; }
+    if (!password) { showError('Please enter a password'); if(passwordInput) passwordInput.focus(); return; }
+    if (password.length < 6) { showError('Password must be at least 6 characters long'); if(passwordInput) passwordInput.focus(); return; }
 
     if (!isLogin) {
-      if (!confirmPassword) {
-        showError('Please confirm your password');
-        if (confirmPasswordInput) confirmPasswordInput.focus();
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        showError('Passwords do not match');
-        if (confirmPasswordInput) confirmPasswordInput.focus();
-        return;
-      }
+      if (!confirmPassword) { showError('Please confirm your password'); if(confirmPasswordInput) confirmPasswordInput.focus(); return; }
+      if (password !== confirmPassword) { showError('Passwords do not match'); if(confirmPasswordInput) confirmPasswordInput.focus(); return; }
     }
 
-    // Submit
     await submitAuth(email, password);
   }
 
-  /**
-   * Submit authentication request
-   */
   async function submitAuth(email, password) {
     isSubmitting = true;
-    const submitBtnEl = document.getElementById('auth-submit-btn');
-    const originalText = submitBtnEl?.textContent || 'Sign In';
+    const originalText = submitBtn.textContent;
 
     try {
-      // Show loading state
-      if (submitBtnEl) {
-        submitBtnEl.disabled = true;
-        submitBtnEl.textContent = isLogin ? 'Signing In...' : 'Creating Account...';
-      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = isLogin ? 'Signing In...' : 'Creating Account...';
 
       if (isLogin) {
         await signIn(email, password);
-        console.log('Sign in successful');
       } else {
         await signUp(email, password);
-        console.log('Sign up successful');
       }
-
-      // Form will be hidden by the app when auth state changes
       if (authForm) authForm.reset();
-
     } catch (error) {
-      console.error('Auth error:', error);
       showError(error.message || 'Authentication failed. Please try again.');
-
-      // Restore button
-      if (submitBtnEl) {
-        submitBtnEl.disabled = false;
-        submitBtnEl.textContent = originalText;
-      }
-
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     } finally {
       isSubmitting = false;
     }
@@ -171,7 +144,6 @@ export function setupAuthHandlers() {
     if (!authError) return;
     authError.textContent = message;
     authError.style.display = 'block';
-    authError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function clearErrors() {
@@ -181,61 +153,43 @@ export function setupAuthHandlers() {
   }
 }
 
-/**
- * Validate email format
- */
 function isValidEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
-/**
- * Show authentication screen
- */
 export function showAuthScreen(authScreen, appContainer) {
   authScreen.style.display = 'flex';
   appContainer.style.display = 'none';
-
-  // Focus on email input for better UX
-  setTimeout(() => {
-    document.getElementById('email').focus();
-  }, 100);
+  setTimeout(() => { if(document.getElementById('email')) document.getElementById('email').focus(); }, 100);
 }
 
-/**
- * Hide authentication screen
- */
 export function hideAuthScreen(authScreen, appContainer) {
   authScreen.style.display = 'none';
   appContainer.style.display = 'flex';
 }
 
-/**
- * Reset auth form to login state
- */
 export function resetAuthForm() {
   const authForm = document.getElementById('auth-form');
   const confirmPasswordGroup = document.getElementById('confirm-password-group');
   const submitBtn = document.getElementById('auth-submit-btn');
   const toggleBtn = document.getElementById('auth-toggle-btn');
-  const authSubtitle = document.getElementById('auth-subtitle');
+  const authSubtitle = document.querySelector('.auth-subtitle');
   const authError = document.getElementById('auth-error');
+  const googleBtn = document.getElementById('google-auth-btn'); // ✅ NEW
 
   isLogin = true;
   isSubmitting = false;
 
   if (authForm) authForm.reset();
   if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'none';
-  if (submitBtn) submitBtn.textContent = 'Sign In';
-  if (submitBtn) submitBtn.disabled = false;
+  if (submitBtn) { submitBtn.textContent = 'Sign In'; submitBtn.disabled = false; }
   if (toggleBtn) toggleBtn.textContent = "Don't have an account? Sign Up";
   if (authSubtitle) authSubtitle.textContent = 'Sign in to continue';
   if (authError) authError.style.display = 'none';
+  if (googleBtn) googleBtn.style.display = 'flex'; // ✅ NEW: Ensure button is visible on reset
 }
 
-/**
- * Update UI with current user info
- */
 export function updateUserDisplay(email) {
   const userEmailElement = document.getElementById('sidebar-user-email');
   if (userEmailElement) {

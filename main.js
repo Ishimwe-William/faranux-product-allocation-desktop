@@ -1,12 +1,74 @@
+/* ============================================
+   main.js - Electron Main Process (UPDATED)
+   ============================================ */
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const http = require('http'); // Required for local server
+const fs = require('fs');     // Required to read files
 require('dotenv').config();
 
 let mainWindow;
+let server;
 
+// Load env from current directory
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-function createWindow() {
+// MIME types to ensure files allow the browser to interpret them correctly
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon'
+};
+
+// Create a simple local HTTP server to serve the 'renderer' folder
+function createLocalServer() {
+  return new Promise((resolve) => {
+    server = http.createServer((req, res) => {
+      // 1. Determine the file path.
+      // We assume your 'index.html' and assets are inside the 'renderer' folder.
+      // If the URL is '/', serve 'renderer/index.html'.
+      let fileUrl = req.url === '/' ? 'index.html' : req.url;
+      let filePath = path.join(__dirname, 'renderer', fileUrl);
+
+      const extname = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[extname] || 'application/octet-stream';
+
+      fs.readFile(filePath, (error, content) => {
+        if (error) {
+          if (error.code === 'ENOENT') {
+            console.warn(`[Server] 404 Not Found: ${filePath}`);
+            res.writeHead(404);
+            res.end('404 Not Found');
+          } else {
+            console.error(`[Server] 500 Error: ${error.code} for ${filePath}`);
+            res.writeHead(500);
+            res.end('500 Internal Server Error');
+          }
+        } else {
+          res.writeHead(200, { 'Content-Type': contentType });
+          res.end(content, 'utf-8');
+        }
+      });
+    });
+
+    // Listen on port 0 (lets the OS pick a random available port)
+    server.listen(0, '127.0.0.1', () => {
+      const port = server.address().port;
+      console.log(`[Main] Local server running on port ${port}`);
+      resolve(port);
+    });
+  });
+}
+
+async function createWindow() {
+  // Start the server before creating the window
+  const port = await createLocalServer();
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -23,20 +85,28 @@ function createWindow() {
     frame: true
   });
 
-  mainWindow.loadFile('renderer/index.html');
+  // CHANGE: Load from localhost instead of file://
+  await mainWindow.loadURL(`http://127.0.0.1:${port}`);
 
-  // Handle navigation to external URLs - open in default browser instead of within Electron
+  mainWindow.webContents.openDevTools();
+
+  // Handle navigation to external URLs (open in browser)
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      if (!url.startsWith(mainWindow.webContents.getURL())) {
-        event.preventDefault();
-        shell.openExternal(url);
-      }
+    const isLocal = url.startsWith(`http://127.0.0.1:${port}`);
+    if (!isLocal && (url.startsWith('http://') || url.startsWith('https://'))) {
+      event.preventDefault();
+      shell.openExternal(url);
     }
   });
 
-  // Also handle new window requests (right-click > open in new window)
+  // Handle popup windows (CRITICAL for Google Sign-In)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow Google Auth popups to open
+    if (url.startsWith('https://accounts.google.com') || url.includes('firebaseapp.com') || url.includes('auth')) {
+      return { action: 'allow' };
+    }
+
+    // Open other external links in default browser
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
       return { action: 'deny' };
@@ -44,15 +114,10 @@ function createWindow() {
     return { action: 'allow' };
   });
 
-  // Always open DevTools to see errors
-  // mainWindow.webContents.openDevTools();
-
-  // Log when ready
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[Main] Page loaded successfully');
   });
 
-  // Log errors
   mainWindow.webContents.on('crashed', () => {
     console.error('[Main] Renderer process crashed');
   });
@@ -76,7 +141,7 @@ app.on('activate', () => {
   }
 });
 
-// Get environment variables (safe to expose public Firebase config and Google Sheets config)
+// IPC Handlers
 ipcMain.handle('get-env', () => {
   return {
     FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -93,7 +158,6 @@ ipcMain.handle('get-env', () => {
   };
 });
 
-// Open external URLs in default browser
 ipcMain.handle('open-external', async (event, url) => {
   try {
     await shell.openExternal(url);

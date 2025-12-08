@@ -1,15 +1,14 @@
 /* ============================================
-   store.js - State Management
+   store.js - State Management (UPDATED)
    ============================================ */
 
-// ToDo: add network state
-// ToDo: create error pages
 export class Store {
   constructor() {
     this.state = {
       auth: {
         user: null,
-        isAuthenticated: false
+        isAuthenticated: false,
+        googleAccessToken: null // ✅ NEW: To store the Google OAuth token
       },
       shelves: {
         items: [],
@@ -39,13 +38,11 @@ export class Store {
         compactMode: false,
         showGridLabels: true,
         animationsEnabled: true,
-        // theme: 'system' | 'light' | 'dark'
         theme: 'system',
-        // sidebar: true (expanded) | false (collapsed)
         sidebarCollapsed: false
       }
     };
-    
+
     this.listeners = [];
     this.loadFromStorage();
   }
@@ -112,10 +109,22 @@ export class Store {
 
   // Auth actions
   setUser(user) {
+    // We merge to avoid overwriting the token if it exists and we're just updating the user object
     this.setState({
       auth: {
+        ...this.state.auth,
         user,
         isAuthenticated: !!user
+      }
+    });
+  }
+
+  // ✅ NEW: Action to store the Google Access Token
+  setGoogleToken(token) {
+    this.setState({
+      auth: {
+        ...this.state.auth,
+        googleAccessToken: token
       }
     });
   }
