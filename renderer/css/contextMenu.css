@@ -1,0 +1,107 @@
+/* ============================================
+   contextMenu.css - Custom Context Menu Styles
+   ============================================ */
+
+.custom-context-menu {
+    position: fixed;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 4px 0;
+    min-width: 180px;
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
+    display: none;
+    backdrop-filter: blur(8px);
+    animation: contextMenuFadeIn 0.15s ease;
+}
+
+.custom-context-menu.visible {
+    display: block;
+}
+
+@keyframes contextMenuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    color: var(--color-text);
+    font-size: 14px;
+    user-select: none;
+}
+
+.context-menu-item:hover {
+    background: var(--color-surface-hover);
+}
+
+.context-menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.context-menu-item .material-icons {
+    font-size: 18px;
+    color: var(--color-text-secondary);
+}
+
+.context-menu-item:hover .material-icons {
+    color: var(--color-text);
+}
+
+.context-menu-shortcut {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    font-family: var(--font-mono);
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--color-border);
+    margin: 4px 8px;
+}
+
+.context-menu-label {
+    padding: 6px 16px;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Special styling for dangerous actions */
+.context-menu-item.danger {
+    color: var(--color-error);
+}
+
+.context-menu-item.danger .material-icons {
+    color: var(--color-error);
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* For nested submenus (if needed in future) */
+.context-menu-item.has-submenu::after {
+    content: 'chevron_right';
+    font-family: 'Material Icons';
+    margin-left: auto;
+    font-size: 18px;
+    color: var(--color-text-tertiary);
+}

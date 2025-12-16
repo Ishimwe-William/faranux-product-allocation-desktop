@@ -1,7 +1,7 @@
 /* ==================================
    main.js - Electron Main Process
-   ================================ */
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+   ================================== */
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -109,6 +109,118 @@ async function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Setup context menu for right-click
+  setupContextMenu();
+}
+
+function setupContextMenu() {
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const { selectionText, isEditable, linkURL, mediaType } = params;
+
+    const menuTemplate = [];
+
+    // Text selection options
+    if (selectionText) {
+      menuTemplate.push(
+          {
+            label: 'Copy',
+            role: 'copy',
+            accelerator: 'CmdOrCtrl+C'
+          },
+          { type: 'separator' }
+      );
+    }
+
+    // Editable field options
+    if (isEditable) {
+      if (selectionText) {
+        menuTemplate.push(
+            {
+              label: 'Cut',
+              role: 'cut',
+              accelerator: 'CmdOrCtrl+X'
+            },
+            {
+              label: 'Copy',
+              role: 'copy',
+              accelerator: 'CmdOrCtrl+C'
+            }
+        );
+      }
+
+      menuTemplate.push(
+          {
+            label: 'Paste',
+            role: 'paste',
+            accelerator: 'CmdOrCtrl+V'
+          },
+          { type: 'separator' },
+          {
+            label: 'Select All',
+            role: 'selectAll',
+            accelerator: 'CmdOrCtrl+A'
+          }
+      );
+    }
+
+    // Link options
+    if (linkURL) {
+      menuTemplate.push(
+          {
+            label: 'Open Link',
+            click: () => {
+              shell.openExternal(linkURL);
+            }
+          },
+          {
+            label: 'Copy Link Address',
+            click: () => {
+              const { clipboard } = require('electron');
+              clipboard.writeText(linkURL);
+            }
+          },
+          { type: 'separator' }
+      );
+    }
+
+    // Image options
+    if (mediaType === 'image') {
+      menuTemplate.push(
+          {
+            label: 'Copy Image',
+            role: 'copyImageAt'
+          },
+          {
+            label: 'Save Image As...',
+            role: 'downloadURL'
+          },
+          { type: 'separator' }
+      );
+    }
+
+    // Developer tools (always available)
+    menuTemplate.push(
+        {
+          label: 'Inspect Element',
+          click: () => {
+            mainWindow.webContents.inspectElement(params.x, params.y);
+          },
+          accelerator: 'CmdOrCtrl+Shift+I'
+        },
+        {
+          label: 'Reload',
+          role: 'reload',
+          accelerator: 'CmdOrCtrl+R'
+        }
+    );
+
+    // Only show menu if there are items
+    if (menuTemplate.length > 0) {
+      const contextMenu = Menu.buildFromTemplate(menuTemplate);
+      contextMenu.popup({ window: mainWindow });
+    }
   });
 }
 

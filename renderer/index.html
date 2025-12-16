@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/auth.css">
     <link rel="stylesheet" href="css/modal.css">
     <link rel="stylesheet" href="css/analytics.css">
+    <link rel="stylesheet" href="css/contextMenu.css">
 
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -92,13 +93,13 @@
                     <span class="material-icons">search</span>
                     <span>Products</span>
                 </a>
-                <a href="#/settings" class="nav-item" data-route="settings">
-                    <span class="material-icons">settings</span>
-                    <span>Settings</span>
-                </a>
                 <a href="#/analytics" class="nav-item" data-route="analytics">
                     <span class="material-icons">analytics</span>
                     <span>Analytics</span>
+                </a>
+                <a href="#/settings" class="nav-item" data-route="settings">
+                    <span class="material-icons">settings</span>
+                    <span>Settings</span>
                 </a>
             </nav>
             
@@ -152,6 +153,15 @@
 
     <!-- Modal Container -->
     <div id="modal-container"></div>
+
+    <script type="module">
+        import { initContextMenu } from './js/contextMenu.js';
+
+        // Initialize context menu when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            initContextMenu();
+        });
+    </script>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>

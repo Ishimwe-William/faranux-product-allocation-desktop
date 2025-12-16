@@ -17,6 +17,7 @@ import { router } from './router.js';
 import { initializeFirebase, signIn, signUp, signOut } from './firebase.js';
 import { fetchProducts, fetchLocations, buildShelves } from './googleSheets.js';
 import { fetchWooProducts } from './woocommerce.js';
+import { initContextMenu } from './contextMenu.js';
 
 import { renderShelvesView } from './views/shelves.js';
 import { renderShelfDetailView } from './views/shelfDetail.js';
@@ -48,6 +49,7 @@ async function initApp() {
 
     try {
         await initializeFirebase();
+        initContextMenu();
 
         prevState = store.getState();
         store.subscribe(handleStateChange);

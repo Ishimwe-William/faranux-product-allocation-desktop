@@ -71,7 +71,7 @@
     font-weight: 500;
     cursor: pointer;
     border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
+    margin-bottom: 1px;
     transition: all var(--transition-fast);
     white-space: nowrap;
 }
