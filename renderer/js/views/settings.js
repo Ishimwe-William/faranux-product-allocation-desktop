@@ -5,6 +5,7 @@
 import {store} from '../store.js';
 import {signOut} from '../firebase.js';
 import {fetchProducts, fetchLocations, buildShelves} from '../googleSheets.js';
+import {fetchWooProducts} from '../woocommerce.js';
 import {showCustomAlert, showCustomConfirm} from '../components/modal.js';
 
 export function renderSettingsView() {
@@ -144,6 +145,26 @@ export function renderSettingsView() {
         </div>
       </div>
 
+      <!-- Integrations Section -->
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2 class="settings-section-title">Integrations</h2>
+          <p class="settings-section-subtitle">Connect external services</p>
+        </div>
+        <div class="card settings-option-card card-clickable" id="open-woocommerce">
+          <div class="option-card-left">
+            <div class="option-card-icon">
+              <span class="material-icons">shopping_cart</span>
+            </div>
+            <div class="option-card-info">
+              <div class="option-card-title">WooCommerce</div>
+              <div class="option-card-subtitle">Sync with your online store</div>
+            </div>
+          </div>
+          <span class="material-icons option-card-arrow">chevron_right</span>
+        </div>
+      </div>
+
       <!-- Advanced Section -->
       <div class="settings-section">
         <div class="settings-section-header">
@@ -191,6 +212,7 @@ export function renderSettingsView() {
     const fullSyncCard = document.getElementById('full-sync-card');
     const logoutBtn = document.getElementById('settings-logout-btn');
     const diagnosticsCard = document.getElementById('open-diagnostics');
+    const wooCard = document.getElementById('open-woocommerce');
 
     if (syncProductsBtn) syncProductsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -204,6 +226,9 @@ export function renderSettingsView() {
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
     if (diagnosticsCard) diagnosticsCard.addEventListener('click', () => {
         window.location.hash = '#/settings/diagnostics';
+    });
+    if (wooCard) wooCard.addEventListener('click', () => {
+        window.location.hash = '#/settings/woocommerce';
     });
 
     // Theme handling
@@ -291,7 +316,7 @@ export function renderSettingsView() {
     }
 
     async function fullSync() {
-        const ok = await showCustomConfirm('Sync All Data', 'Reload all products and shelves?', 'warning');
+        const ok = await showCustomConfirm('Sync All Data', 'Reload all products, shelves, and WooCommerce data?', 'warning');
         if (!ok) return;
 
         const card = document.getElementById('full-sync-card');
@@ -315,6 +340,16 @@ export function renderSettingsView() {
             store.setProducts(products, locations);
             const shelves = buildShelves(locations);
             store.setShelves(shelves);
+
+            // Sync WooCommerce if enabled
+            const wooEnabled = store.getState().config?.woocommerce?.enabled;
+            if (wooEnabled) {
+                try {
+                    await fetchWooProducts();
+                } catch (e) {
+                    console.warn('WooCommerce sync failed:', e);
+                }
+            }
 
             const prodCount = document.getElementById('products-count');
             const prodLast = document.getElementById('products-last-sync');

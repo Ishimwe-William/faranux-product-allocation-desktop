@@ -1,19 +1,17 @@
-/* ============================================
-   main.js - Electron Main Process (UPDATED)
-   ============================================ */
+/* ==================================
+   main.js - Electron Main Process
+   ================================ */
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const http = require('http'); // Required for local server
-const fs = require('fs');     // Required to read files
+const http = require('http');
+const fs = require('fs');
 require('dotenv').config();
 
 let mainWindow;
 let server;
 
-// Load env from current directory
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-// MIME types to ensure files allow the browser to interpret them correctly
 const MIME_TYPES = {
   '.html': 'text/html',
   '.js': 'text/javascript',
@@ -25,13 +23,9 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
-// Create a simple local HTTP server to serve the 'renderer' folder
 function createLocalServer() {
   return new Promise((resolve) => {
     server = http.createServer((req, res) => {
-      // 1. Determine the file path.
-      // We assume your 'index.html' and assets are inside the 'renderer' folder.
-      // If the URL is '/', serve 'renderer/index.html'.
       let fileUrl = req.url === '/' ? 'index.html' : req.url;
       let filePath = path.join(__dirname, 'renderer', fileUrl);
 
@@ -56,7 +50,6 @@ function createLocalServer() {
       });
     });
 
-    // Listen on port 0 (lets the OS pick a random available port)
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port;
       console.log(`[Main] Local server running on port ${port}`);
@@ -66,7 +59,6 @@ function createLocalServer() {
 }
 
 async function createWindow() {
-  // Start the server before creating the window
   const port = await createLocalServer();
 
   mainWindow = new BrowserWindow({
@@ -85,12 +77,8 @@ async function createWindow() {
     frame: true
   });
 
-  // CHANGE: Load from localhost instead of file://
   await mainWindow.loadURL(`http://127.0.0.1:${port}`);
 
-  // mainWindow.webContents.openDevTools();
-
-  // Handle navigation to external URLs (open in browser)
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const isLocal = url.startsWith(`http://127.0.0.1:${port}`);
     if (!isLocal && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -99,14 +87,11 @@ async function createWindow() {
     }
   });
 
-  // Handle popup windows (CRITICAL for Google Sign-In)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Allow Google Auth popups to open
     if (url.startsWith('https://accounts.google.com') || url.includes('firebaseapp.com') || url.includes('auth')) {
       return { action: 'allow' };
     }
 
-    // Open other external links in default browser
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
       return { action: 'deny' };
@@ -153,6 +138,8 @@ ipcMain.handle('get-env', () => {
     GSHEETS_API_KEY: process.env.EXPO_PUBLIC_GSHEETS_API_KEY,
     GSHEET_ID: process.env.EXPO_PUBLIC_GSHEET_ID,
     APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
+    WOO_CONSUMER_KEY: process.env.CONSUMER_KEY,
+    WOO_CONSUMER_SECRET: process.env.CONSUMER_SECRET,
     DEBUG: process.env.DEBUG === 'true',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info'
   };
@@ -166,4 +153,41 @@ ipcMain.handle('open-external', async (event, url) => {
     console.error('Error opening external URL:', error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle('woo-request', async (event, { siteUrl, consumerKey, consumerSecret, endpoint, method = 'GET' }) => {
+  return new Promise((resolve) => {
+    if (!siteUrl || !consumerKey || !consumerSecret) {
+      return resolve({ success: false, error: 'Missing WooCommerce configuration' });
+    }
+
+    const baseUrl = siteUrl.replace(/\/$/, '');
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const fullUrl = `${baseUrl}/wp-json/wc/v3${cleanEndpoint}`;
+
+    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+
+    const options = {
+      method: method,
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Electron-Inventory-App'
+      }
+    };
+
+    fetch(fullUrl, options)
+        .then(async response => {
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`WooCommerce Error ${response.status}: ${text}`);
+          }
+          return response.json();
+        })
+        .then(data => resolve({ success: true, data }))
+        .catch(error => {
+          console.error('Woo Request Failed:', error);
+          resolve({ success: false, error: error.message });
+        });
+  });
 });

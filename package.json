@@ -33,7 +33,7 @@
       "output": "dist"
     }
   },
-  "author": "WILLIAM ISHIMWE",
+  "author": "Bunsenplus",
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.6.1",

@@ -1,5 +1,5 @@
 /* ============================================
-   store.js - State Management (UPDATED)
+   store.js - State Management
    ============================================ */
 
 export class Store {
@@ -8,7 +8,7 @@ export class Store {
       auth: {
         user: null,
         isAuthenticated: false,
-        googleAccessToken: null // ✅ NEW: To store the Google OAuth token
+        googleAccessToken: null
       },
       shelves: {
         items: [],
@@ -23,11 +23,23 @@ export class Store {
         error: null,
         lastSync: null
       },
+      woocommerce: {
+        products: [],
+        loading: false,
+        error: null,
+        lastSync: null
+      },
       config: {
         sheetId: null,
         sheetUrl: null,
         lastUpdated: null,
-        updatedBy: null
+        updatedBy: null,
+        woocommerce: {
+          siteUrl: null,
+          consumerKey: null,
+          consumerSecret: null,
+          enabled: false
+        }
       },
       display: {
         scalePreset: 'normal',
@@ -47,7 +59,6 @@ export class Store {
     this.loadFromStorage();
   }
 
-  // Subscribe to state changes
   subscribe(listener) {
     this.listeners.push(listener);
     return () => {
@@ -55,24 +66,20 @@ export class Store {
     };
   }
 
-  // Notify all listeners
   notify() {
     this.listeners.forEach(listener => listener(this.state));
   }
 
-  // Get current state
   getState() {
     return this.state;
   }
 
-  // Update state
   setState(updates) {
     this.state = this.deepMerge(this.state, updates);
     this.notify();
     this.saveToStorage();
   }
 
-  // Deep merge helper
   deepMerge(target, source) {
     const output = { ...target };
     for (const key in source) {
@@ -85,16 +92,20 @@ export class Store {
     return output;
   }
 
-  // Save to localStorage
   saveToStorage() {
     const persistData = {
       display: this.state.display,
-      config: this.state.config
+      config: {
+        sheetId: this.state.config.sheetId,
+        sheetUrl: this.state.config.sheetUrl
+      },
+      auth: {
+        googleAccessToken: this.state.auth.googleAccessToken
+      }
     };
     localStorage.setItem('inventoryAppState', JSON.stringify(persistData));
   }
 
-  // Load from localStorage
   loadFromStorage() {
     try {
       const saved = localStorage.getItem('inventoryAppState');
@@ -107,9 +118,7 @@ export class Store {
     }
   }
 
-  // Auth actions
   setUser(user) {
-    // We merge to avoid overwriting the token if it exists and we're just updating the user object
     this.setState({
       auth: {
         ...this.state.auth,
@@ -119,7 +128,6 @@ export class Store {
     });
   }
 
-  // ✅ NEW: Action to store the Google Access Token
   setGoogleToken(token) {
     this.setState({
       auth: {
@@ -129,7 +137,6 @@ export class Store {
     });
   }
 
-  // Shelves actions
   setShelves(items) {
     this.setState({
       shelves: {
@@ -153,7 +160,6 @@ export class Store {
     });
   }
 
-  // Products actions
   setProducts(items, locations) {
     this.setState({
       products: {
@@ -178,12 +184,34 @@ export class Store {
     });
   }
 
-  // Config actions
+  // WooCommerce actions
+  setWooProducts(products) {
+    this.setState({
+      woocommerce: {
+        products,
+        loading: false,
+        error: null,
+        lastSync: new Date().toISOString()
+      }
+    });
+  }
+
+  setWooLoading(loading) {
+    this.setState({
+      woocommerce: { ...this.state.woocommerce, loading }
+    });
+  }
+
+  setWooError(error) {
+    this.setState({
+      woocommerce: { ...this.state.woocommerce, error, loading: false }
+    });
+  }
+
   setConfig(config) {
     this.setState({ config });
   }
 
-  // Display actions
   setDisplaySettings(settings) {
     this.setState({
       display: { ...this.state.display, ...settings }
@@ -191,5 +219,4 @@ export class Store {
   }
 }
 
-// Create singleton instance
 export const store = new Store();

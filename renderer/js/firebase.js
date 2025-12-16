@@ -1,10 +1,9 @@
 /* ============================================
-   firebase.js - Firebase Integration (UPDATED)
+   firebase.js - Firebase Integration
    ============================================ */
 
 import { store } from './store.js';
 
-// Firebase configuration will be loaded from environment
 let firebaseConfig = {
     apiKey: "YOUR_FIREBASE_API_KEY",
     authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -14,16 +13,12 @@ let firebaseConfig = {
     appId: "YOUR_APP_ID"
 };
 
-let app, auth, db, googleProvider; // ✅ NEW: Added googleProvider
+let app, auth, db, googleProvider;
 let isInitialized = false;
 let unsubscribeConfig = null;
 
-/**
- * Load Firebase configuration from environment variables
- */
 async function loadFirebaseConfig() {
     try {
-        // Try to get from Electron API
         if (window.electronAPI && window.electronAPI.getEnv) {
             const env = await window.electronAPI.getEnv();
             firebaseConfig = {
@@ -47,7 +42,6 @@ async function loadFirebaseConfig() {
     }
 }
 
-// Initialize Firebase
 export async function initializeFirebase() {
     try {
         if (isInitialized) {
@@ -64,16 +58,13 @@ export async function initializeFirebase() {
         auth = firebase.auth();
         db = firebase.firestore();
 
-        // ✅ NEW: Initialize Google Provider with Scopes
         googleProvider = new firebase.auth.GoogleAuthProvider();
-        // CRITICAL: Request permission to read sheets for domain-restricted access
         googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
-        // Optional: If accessing Excel files from Drive, add this too:
         googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
 
         isInitialized = true;
 
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async (user) => {
             if (user) {
                 store.setUser({
                     uid: user.uid,
@@ -81,6 +72,20 @@ export async function initializeFirebase() {
                     displayName: user.displayName,
                     photoURL: user.photoURL
                 });
+
+                // Try to get a fresh token if user is logged in
+                const state = store.getState();
+                if (!state.auth.googleAccessToken) {
+                    try {
+                        const result = await auth.currentUser.getIdTokenResult();
+                        if (result && result.signInProvider === 'google.com') {
+                            // User signed in with Google but token not in storage
+                            console.log('[Auth] Google user detected, token may have expired');
+                        }
+                    } catch (e) {
+                        console.warn('[Auth] Could not verify sign-in provider:', e);
+                    }
+                }
 
                 if (unsubscribeConfig) {
                     unsubscribeConfig();
@@ -92,7 +97,6 @@ export async function initializeFirebase() {
 
             } else {
                 store.setUser(null);
-                // ✅ NEW: Clear the token on sign out
                 store.setGoogleToken(null);
 
                 if (unsubscribeConfig) {
@@ -109,7 +113,6 @@ export async function initializeFirebase() {
     }
 }
 
-// Sign in (Email/Password)
 export async function signIn(email, password) {
     try {
         if (!auth) throw new Error('Firebase not initialized.');
@@ -120,19 +123,15 @@ export async function signIn(email, password) {
     }
 }
 
-// ✅ NEW: Sign in with Google (OAuth)
 export async function signInWithGoogle() {
     try {
         if (!auth) throw new Error('Firebase not initialized.');
 
-        // Triggers the Google sign-in popup
         const result = await auth.signInWithPopup(googleProvider);
 
-        // Get the OAuth token needed for Sheets API access
         const credential = result.credential;
         const token = credential.accessToken;
 
-        // Save token to store for use in googleSheets.js
         store.setGoogleToken(token);
 
         return result.user;
@@ -142,9 +141,7 @@ export async function signInWithGoogle() {
     }
 }
 
-// Sign up
 export async function signUp(email, password) {
-// ... (rest of signUp function remains the same)
     try {
         if (!auth) throw new Error('Firebase not initialized.');
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
@@ -154,9 +151,7 @@ export async function signUp(email, password) {
     }
 }
 
-// Sign out
 export async function signOut() {
-// ... (rest of signOut function remains the same)
     try {
         await auth.signOut();
     } catch (error) {
@@ -187,7 +182,6 @@ function formatAuthError(error) {
 }
 
 export async function loadAppConfig() {
-// ... (this function remains the same)
     try {
         const configDoc = await db.collection('settings').doc('app_config').get();
         if (configDoc.exists) {
@@ -199,26 +193,48 @@ export async function loadAppConfig() {
 }
 
 export async function updateSheetId(sheetId, userEmail) {
-// ... (this function remains the same)
     try {
-        const config = {
+        const config = store.getState().config;
+        const updatedConfig = {
+            ...config,
             sheetId,
             sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null,
             lastUpdated: new Date().toISOString(),
             updatedBy: userEmail
         };
 
-        await db.collection('settings').doc('app_config').set(config, { merge: true });
-        store.setConfig(config);
-        return config;
+        await db.collection('settings').doc('app_config').set(updatedConfig, { merge: true });
+        store.setConfig(updatedConfig);
+        return updatedConfig;
     } catch (error) {
         console.error('Error updating sheet ID:', error);
         throw error;
     }
 }
 
+// WooCommerce Configuration
+export async function updateWooConfig(wooConfig, userEmail) {
+    try {
+        const config = store.getState().config;
+        const updatedConfig = {
+            ...config,
+            woocommerce: {
+                ...wooConfig,
+                lastUpdated: new Date().toISOString(),
+                updatedBy: userEmail
+            }
+        };
+
+        await db.collection('settings').doc('app_config').set(updatedConfig, { merge: true });
+        store.setConfig(updatedConfig);
+        return updatedConfig;
+    } catch (error) {
+        console.error('Error updating WooCommerce config:', error);
+        throw error;
+    }
+}
+
 export function subscribeToConfig(callback) {
-// ... (this function remains the same)
     return db.collection('settings').doc('app_config').onSnapshot(
         doc => {
             if (doc.exists) {
