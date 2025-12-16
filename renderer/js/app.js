@@ -25,6 +25,7 @@ import { renderProductsView } from './views/products.js';
 import { renderSettingsView } from './views/settings.js';
 import { renderDiagnosticsView } from './views/diagnostics.js';
 import { renderWooSettingsView } from './views/wooSettings.js';
+import { renderAnalyticsView } from './views/analytics.js';
 import { setupAuthHandlers as initAuthHandlers, showAuthScreen, hideAuthScreen, resetAuthForm, updateUserDisplay } from './views/auth.js';
 
 import { showCustomConfirm } from './components/modal.js';
@@ -144,6 +145,7 @@ function registerRoutes() {
     router.register('/shelf', renderShelfDetailView);
     router.register('/box', renderBoxDetailView);
     router.register('/products', renderProductsView);
+    router.register('/analytics', renderAnalyticsView);
     router.register('/settings', renderSettingsView);
     router.register('/settings/diagnostics', renderDiagnosticsView);
     router.register('/settings/woocommerce', renderWooSettingsView);
