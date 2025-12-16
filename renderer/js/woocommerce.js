@@ -1,5 +1,5 @@
 /* ============================================
-   woocommerce.js - WooCommerce Integration Service
+   js/woocommerce.js
    ============================================ */
 import { store } from './store.js';
 
@@ -33,15 +33,17 @@ export async function fetchWooProducts() {
             const products = response.data;
             allProducts = allProducts.concat(products);
 
-            // Check if there are more pages
+            // If response includes headers for total, use them. Otherwise just show count.
+            const total = response.headers ? parseInt(response.headers['x-wp-total']) : 0;
+
+            // Update progress in store
+            store.setWooProgress(allProducts.length, total);
+
             hasMore = products.length === perPage;
             page++;
-
-            console.log(`[Woo] Fetched page ${page - 1}, total products: ${allProducts.length}`);
         }
 
         store.setWooProducts(allProducts);
-        console.log(`[Woo] Sync complete: ${allProducts.length} products`);
         return allProducts;
 
     } catch (error) {

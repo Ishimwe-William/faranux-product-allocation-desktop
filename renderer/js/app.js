@@ -1,6 +1,6 @@
-/* ======================================
-   app.js - Main Application Entry Point
-   ====================================== */
+/* ============================================
+   js/app.js
+   ============================================ */
 
 window.addEventListener('error', (event) => {
     console.error('Global error:', event.error);
@@ -33,7 +33,6 @@ import { showCustomConfirm } from './components/modal.js';
 let authScreen, appContainer, authForm, authError;
 let loadingOverlay, loadingText;
 
-let isAppInitialized = false;
 let wasAuthenticated = false;
 let prevState = null;
 
@@ -177,13 +176,18 @@ function handleStateChange(state) {
         }
     }
 
+    // 1. Update Sidebar Progress
+    updateSidebarSyncStatus(state.woocommerce);
+
+    // 2. Refresh active view if data changes
     try {
         const prevShelvesCount = prevState?.shelves?.items?.length || 0;
-        const prevProductsSync = prevState?.products?.lastSync || null;
         const newShelvesCount = state?.shelves?.items?.length || 0;
-        const newProductsSync = state?.products?.lastSync || null;
+        const prevWooCount = prevState?.woocommerce?.products?.length || 0;
+        const newWooCount = state?.woocommerce?.products?.length || 0;
+        const wooLoadingChanged = prevState?.woocommerce?.loading !== state?.woocommerce?.loading;
 
-        if (prevShelvesCount !== newShelvesCount || prevProductsSync !== newProductsSync) {
+        if (prevShelvesCount !== newShelvesCount || prevWooCount !== newWooCount || wooLoadingChanged) {
             if (router && typeof router.handleRoute === 'function') {
                 router.handleRoute();
             }
@@ -193,6 +197,59 @@ function handleStateChange(state) {
     }
 
     prevState = state;
+}
+
+function updateSidebarSyncStatus(wooState) {
+    const sidebarFooter = document.querySelector('.sidebar-footer');
+    if (!sidebarFooter) return;
+
+    // Check if progress bar already exists
+    let progressEl = document.getElementById('sidebar-woo-progress');
+    const userInfo = sidebarFooter.querySelector('.user-info');
+
+    if (wooState && wooState.loading) {
+        // Calculate percentage if total is known, otherwise indeterminate
+        const { count, total } = wooState.progress || { count: 0, total: 0 };
+        const width = total > 0 ? (count / total) * 100 : 100;
+        const isIndeterminate = !total || total === 0;
+
+        const html = `
+            <div style="margin-bottom: 12px; font-size: 11px; color: var(--color-text-secondary); padding: 0 4px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px; font-weight: 500;">
+                    <span>Syncing...</span>
+                    <span>${count} ${total ? '/ ' + total : ''}</span>
+                </div>
+                <div style="height: 4px; background: rgba(128,128,128,0.2); border-radius: 2px; overflow: hidden;">
+                    <div style="
+                        height: 100%; 
+                        background: var(--color-primary); 
+                        width: ${isIndeterminate ? '30%' : width + '%'}; 
+                        transition: width 0.3s ease;
+                        ${isIndeterminate ? 'animation: indeterminate 1.5s infinite linear;' : ''}
+                    "></div>
+                </div>
+            </div>
+        `;
+
+        if (!progressEl) {
+            // Create new element
+            progressEl = document.createElement('div');
+            progressEl.id = 'sidebar-woo-progress';
+            progressEl.innerHTML = html;
+            // Insert strictly before user-info
+            if (userInfo) {
+                sidebarFooter.insertBefore(progressEl, userInfo);
+            } else {
+                sidebarFooter.appendChild(progressEl);
+            }
+        } else {
+            // Update existing
+            progressEl.innerHTML = html;
+        }
+    } else {
+        // Remove if not loading
+        if (progressEl) progressEl.remove();
+    }
 }
 
 async function loadInitialData() {
@@ -312,3 +369,12 @@ function updateSidebarUI(isCollapsed) {
         appContainer.classList.toggle('sidebar-collapsed', isCollapsed);
     }
 }
+
+const style = document.createElement('style');
+style.textContent = `
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+`;
+document.head.appendChild(style);

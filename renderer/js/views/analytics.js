@@ -2,18 +2,60 @@
    views/analytics.js - Analytics View
    ============================================ */
 
-import { store } from '../store.js';
-import { matchProductsBySKU } from '../woocommerce.js';
-import { router } from '../router.js';
+import {store} from '../store.js';
+import {matchProductsBySKU} from '../woocommerce.js';
+
+// Format currency with k/M suffix
+function formatCurrency(amount) {
+    const num = parseFloat(amount);
+    if (isNaN(num)) return 'RWF 0';
+
+    if (num >= 1000000) {
+        return `RWF ${(num / 1000000).toFixed(1)}M`;
+    } else if (num >= 1000) {
+        return `RWF ${(num / 1000).toFixed(1)}k`;
+    }
+    return `RWF ${num.toFixed(0)}`;
+}
 
 export function renderAnalyticsView() {
     const container = document.getElementById('view-container');
     const state = store.getState();
+    const wooState = state.woocommerce || {};
 
     document.getElementById('breadcrumbs').textContent = 'Analytics';
 
+    // Insert Sync Progress Bar if loading
+    let syncProgressHtml = '';
+    if (wooState.loading) {
+        const { count, total } = wooState.progress || { count: 0, total: 0 };
+        const percentage = total > 0 ? (count / total) * 100 : 0;
+
+        syncProgressHtml = `
+            <div class="card" style="margin-bottom: 20px; border-left: 4px solid var(--color-primary);">
+                <div style="padding: 12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:500;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <span class="material-icons" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>
+                            Syncing WooCommerce Products...
+                        </span>
+                    </div>
+                    <div style="height: 6px; background: var(--color-background); border-radius: 3px; overflow: hidden;">
+                        <div style="
+                            height: 100%; 
+                            background: var(--color-primary); 
+                            width: ${total ? percentage + '%' : '30%'};
+                            transition: width 0.3s ease;
+                            ${!total ? 'animation: indeterminate 1.5s infinite linear;' : ''}
+                        "></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     const sheetProducts = state.products.items || [];
-    const wooProducts = state.woocommerce.products || [];
+    const wooProducts = wooState.products || [];
     const wooEnabled = state.config?.woocommerce?.enabled;
 
     if (!wooEnabled) {
@@ -45,7 +87,8 @@ export function renderAnalyticsView() {
     const html = `
     <div class="analytics-container">
       
-      <!-- Summary Cards -->
+      ${syncProgressHtml}
+
       <div class="analytics-summary">
         <div class="card analytics-stat-card">
           <div class="stat-icon" style="background: var(--color-success)15;">
@@ -88,7 +131,6 @@ export function renderAnalyticsView() {
         </div>
       </div>
 
-      <!-- Filter Tabs -->
       <div class="analytics-tabs">
         <button class="tab-btn active" data-tab="mismatches">
           <span class="material-icons">sync_problem</span>
@@ -104,7 +146,6 @@ export function renderAnalyticsView() {
         </button>
       </div>
 
-      <!-- Data Tables -->
       <div class="analytics-content">
         <div class="tab-content active" id="tab-mismatches">
           ${renderMismatchesTable(qtyMismatches)}
@@ -276,7 +317,7 @@ function renderWooOnlyTable(products) {
         <td><code class="sku-code">${p.sku || '-'}</code></td>
         <td class="product-name-cell">${p.name || 'Unnamed'}</td>
         <td><strong>${p.stock_quantity || 0}</strong></td>
-        <td>${p.price ? `$${p.price}` : '-'}</td>
+        <td>${p.price ? `${formatCurrency(p.price)}` : '-'}</td>
       </tr>
     `;
     });

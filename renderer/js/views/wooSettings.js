@@ -10,6 +10,7 @@ import { showCustomAlert, showCustomConfirm } from '../components/modal.js';
 export function renderWooSettingsView() {
     const container = document.getElementById('view-container');
     const state = store.getState();
+    const wooState = state.woocommerce || {};
 
     const breadcrumbs = document.getElementById('breadcrumbs');
     breadcrumbs.innerHTML = `
@@ -135,7 +136,7 @@ export function renderWooSettingsView() {
         
         <div class="card diagnostics-test-card">
           <div class="test-card-content">
-            <button id="sync-woo-products" class="btn btn-primary" ${!currentConfig.enabled ? 'disabled' : ''}>
+            <button id="sync-woo-products" class="btn btn-primary" ${!currentConfig.enabled || wooState?.loading ? 'disabled' : ''} >
               <span class="material-icons">cloud_sync</span>
               Sync Products Now
             </button>
@@ -279,7 +280,6 @@ function setupEventListeners(currentConfig, user) {
             // Enable sync button if enabled
             const syncBtn = document.getElementById('sync-woo-products');
             if (syncBtn) syncBtn.disabled = !enabled;
-
         } catch (error) {
             await showCustomAlert('Save Failed', 'Error: ' + error.message, 'error');
         } finally {
