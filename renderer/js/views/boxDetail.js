@@ -1,5 +1,4 @@
 import { store } from '../store.js';
-import { router } from '../router.js';
 import { matchProductsBySKU } from '../woocommerce.js';
 
 export function renderBoxDetailView(params = {}) {
@@ -63,7 +62,7 @@ export function renderBoxDetailView(params = {}) {
       </div>
 
       <div class="box-detail-content">
-        <h3>Products in this box</h3>
+        <h3>Products in this box (${matchedProducts.length})</h3>
         <div id="box-products-list">
           ${renderProductsList(matchedProducts)}
         </div>
@@ -79,7 +78,7 @@ function renderProductsList(matchedProducts) {
     return `<p>No products in this box.</p>`;
   }
 
-  let out = '<div class="products-list">';
+  let out = '<div class="box-products-grid">';
   matchedProducts.forEach(matched => {
     const p = matched.sheetProduct;
     const wooProduct = matched.wooProduct;
@@ -87,64 +86,80 @@ function renderProductsList(matchedProducts) {
     const wooQty = matched.wooQuantity;
 
     const fullName = p.product_name || 'Unnamed product';
-    const pname = fullName.length > 25 ? fullName.substring(0, 25) + '...' : fullName;
+    const pname = fullName.length > 40 ? fullName.substring(0, 40) + '...' : fullName;
     const psku = p.sku || '';
+
+    // Get product image from WooCommerce
+    const productImage = wooProduct?.images?.[0]?.src || null;
 
     let qtyColor = '#10b981';
     if (sheetQty < 5) qtyColor = '#ef4444';
     else if (sheetQty < 10) qtyColor = '#f59e0b';
 
     out += `
-      <div class="product-item" title="${escapeHtml(fullName)}" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: start;">
-          <div>
-            <div style="font-weight: 500;">${escapeHtml(pname)}</div>
-            <div style="font-size: 12px; color: var(--color-text-secondary);">${psku}</div>
+      <div class="box-product-card" title="${escapeHtml(fullName)}">
+        ${productImage ? `
+          <div class="box-product-image">
+            <img src="${productImage}" alt="${escapeHtml(fullName)}" loading="lazy" onerror="this.parentElement.style.display='none'">
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            ${wooProduct ? '<span class="material-icons" style="color: var(--color-primary); font-size: 18px;" title="WooCommerce Connected">shopping_cart</span>' : ''}
+        ` : ''}
+        
+        <div class="box-product-content">
+          <div class="box-product-header">
+            <div>
+              <div class="box-product-name">${escapeHtml(pname)}</div>
+              <div class="box-product-sku">${psku}</div>
+            </div>
+            ${wooProduct ? '<span class="material-icons woo-badge" title="WooCommerce Connected">shopping_cart</span>' : ''}
           </div>
-        </div>
     `;
 
     if (wooProduct) {
       const difference = sheetQty - wooQty;
       let diffColor = 'var(--color-text-secondary)';
+      let diffIcon = 'remove';
       let diffText = 'Same';
 
       if (difference > 0) {
         diffColor = 'var(--color-success)';
-        diffText = `+${difference} in sheet`;
+        diffIcon = 'arrow_upward';
+        diffText = `+${difference}`;
       } else if (difference < 0) {
         diffColor = 'var(--color-error)';
-        diffText = `${difference} in sheet`;
+        diffIcon = 'arrow_downward';
+        diffText = `${difference}`;
       }
 
       out += `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: var(--color-surface); border-radius: 6px;">
-          <div>
-            <div style="font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Sheet</div>
-            <div style="font-size: 16px; font-weight: 600; color: ${qtyColor}">${sheetQty}</div>
+        <div class="box-qty-grid">
+          <div class="box-qty-item">
+            <div class="box-qty-label">Sheet</div>
+            <div class="box-qty-value" style="color: ${qtyColor}">${sheetQty}</div>
           </div>
-          <div>
-            <div style="font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">WooCommerce</div>
-            <div style="font-size: 16px; font-weight: 600;">${wooQty}</div>
+          <div class="box-qty-divider">
+            ${difference !== 0 ? `
+              <span class="material-icons" style="font-size: 14px; color: ${diffColor}">${diffIcon}</span>
+              <span style="font-size: 11px; font-weight: 600; color: ${diffColor}">${diffText}</span>
+            ` : `
+              <span class="material-icons" style="font-size: 14px; color: var(--color-success)">check</span>
+            `}
           </div>
-          <div style="grid-column: 1 / -1; text-align: center; padding: 4px; background: ${diffColor}15; border-radius: 4px;">
-            <span style="font-size: 11px; font-weight: 500; color: ${diffColor}">${diffText}</span>
+          <div class="box-qty-item">
+            <div class="box-qty-label">Woo</div>
+            <div class="box-qty-value">${wooQty}</div>
           </div>
         </div>
       `;
     } else {
       out += `
-        <div style="padding: 8px; background: var(--color-surface); border-radius: 6px;">
-          <div style="font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Sheet Quantity</div>
-          <div style="font-size: 16px; font-weight: 600; color: ${qtyColor}">${sheetQty}</div>
+        <div class="box-qty-single">
+          <div class="box-qty-label">Sheet Quantity</div>
+          <div class="box-qty-value" style="color: ${qtyColor}">${sheetQty}</div>
         </div>
       `;
     }
 
-    out += `</div>`;
+    out += `</div></div>`;
   });
   out += '</div>';
   return out;
