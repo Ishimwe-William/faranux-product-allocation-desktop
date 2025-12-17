@@ -18,7 +18,7 @@ let viewState = {
     activeTab: 'mismatches',
     searchQuery: '',
     currentPage: 1,
-    itemsPerPage: 50, // Render 50 items at a time to prevent DOM lag
+    itemsPerPage: 50,
     sort: {
         mismatches: {column: 'difference', direction: 'desc'},
         'sheet-only': {column: 'sku', direction: 'asc'},
@@ -82,7 +82,6 @@ function formatNumberWithIndicator(value, options = {}) {
 
 // 1. Data Processing with Caching
 function getAnalyticsData(sheetProducts, wooProducts) {
-    // Check if cache is valid (same number of products)
     if (analyticsCache.data &&
         analyticsCache.sheetCount === sheetProducts.length &&
         analyticsCache.wooCount === wooProducts.length) {
@@ -103,7 +102,6 @@ function getAnalyticsData(sheetProducts, wooProducts) {
         })
     };
 
-    // Update Cache
     analyticsCache = {
         data,
         sheetCount: sheetProducts.length,
@@ -137,7 +135,11 @@ function sortData(data, tab) {
             else { valA = a.stock_quantity; valB = b.stock_quantity; }
         }
 
-        if (typeof valA === 'string') return valA.localeCompare(valB) * modifier;
+        // Handle null/undefined gracefully
+        if (valA === null || valA === undefined) valA = '';
+        if (valB === null || valB === undefined) valB = '';
+
+        if (typeof valA === 'string' && typeof valB === 'string') return valA.localeCompare(valB) * modifier;
         return (valA - valB) * modifier;
     });
 }
@@ -163,7 +165,6 @@ export function renderAnalyticsView() {
 
     document.getElementById('breadcrumbs').textContent = 'Analytics';
 
-    // 1. Sync Progress (Hidden if not loading)
     let syncHtml = '';
     if (wooState.loading) {
         const {count, total} = wooState.progress || {count:0, total:0};
@@ -178,7 +179,7 @@ export function renderAnalyticsView() {
                         </span>
                     </div>
                     <div style="height: 6px; background: var(--color-background); border-radius: 3px; overflow: hidden;">
-                        <div style="height: 100%; background: var(--color-primary); width: ${total ? percentage + '%' : '30%'}; transition: width 0.3s ease; ${!total ? 'animation: indeterminate 1.5s infinite linear;' : ''}"></div>
+                        <div style="height: 100%; background: var(--color-primary); width: ${total ? pct + '%' : '30%'}; transition: width 0.3s ease; ${!total ? 'animation: indeterminate 1.5s infinite linear;' : ''}"></div>
                     </div>
                 </div>
             </div>`;
@@ -189,15 +190,14 @@ export function renderAnalyticsView() {
         return;
     }
 
-    // 2. Get Data (Cached if possible)
     const { qtyMismatches, perfectMatches, inSheetNotWoo, inWooNotSheet } = getAnalyticsData(
         state.products.items || [],
         wooState.products || []
     );
 
-    // 3. Render Structure
+    // Note: Added a specific ID to the wrapper to attach events safely
     container.innerHTML = `
-    <div class="analytics-container">
+    <div class="analytics-container" id="analytics-main-container">
       ${syncHtml}
       
       <div class="analytics-summary">
@@ -233,16 +233,11 @@ export function renderAnalyticsView() {
       </div>
 
       <div id="analytics-table-wrapper" class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--color-border); min-height: 400px;">
-         </div>
+      </div>
     </div>`;
 
-    // Data Map for rendering
     const dataMap = {'mismatches': qtyMismatches, 'sheet-only': inSheetNotWoo, 'woo-only': inWooNotSheet};
-
-    // Initial Render
     renderActiveTable(dataMap);
-
-    // Event Listeners
     setupEventListeners(dataMap);
 }
 
@@ -252,28 +247,21 @@ function renderActiveTable(dataMap) {
     const wrapper = document.getElementById('analytics-table-wrapper');
     const tab = viewState.activeTab;
 
-    // 1. Filter
     let data = filterData(dataMap[tab], tab, viewState.searchQuery);
-
-    // 2. Sort
     data = sortData(data, tab);
 
-    // 3. Paginate
     const totalItems = data.length;
     const totalPages = Math.ceil(totalItems / viewState.itemsPerPage);
-    // Ensure current page is valid
     if (viewState.currentPage > totalPages) viewState.currentPage = 1;
 
     const startIdx = (viewState.currentPage - 1) * viewState.itemsPerPage;
     const paginatedData = data.slice(startIdx, startIdx + viewState.itemsPerPage);
 
-    // 4. Generate Table HTML
     let tableHtml = '';
     if (tab === 'mismatches') tableHtml = generateMismatchesTable(paginatedData);
     else if (tab === 'sheet-only') tableHtml = generateSheetOnlyTable(paginatedData);
     else if (tab === 'woo-only') tableHtml = generateWooOnlyTable(paginatedData);
 
-    // 5. Generate Pagination Controls
     const paginationHtml = totalItems > 0 ? `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border); background: var(--color-background);">
             <div style="color: var(--color-text-secondary); font-size: 0.9rem;">
@@ -296,7 +284,6 @@ function renderActiveTable(dataMap) {
         ${paginationHtml}
     `;
 
-    // Bind Pagination Events locally
     const prevBtn = wrapper.querySelector('[data-action="prev"]');
     const nextBtn = wrapper.querySelector('[data-action="next"]');
 
@@ -305,12 +292,12 @@ function renderActiveTable(dataMap) {
 }
 
 function setupEventListeners(dataMap) {
-    // Tab Switching
+    // 1. Tab Switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             viewState.activeTab = btn.dataset.tab;
             viewState.searchQuery = '';
-            viewState.currentPage = 1; // Reset page on tab switch
+            viewState.currentPage = 1;
             document.getElementById('analytics-search').value = '';
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -318,32 +305,41 @@ function setupEventListeners(dataMap) {
         });
     });
 
-    // Debounced Search
+    // 2. Debounced Search
     let timeout = null;
-    document.getElementById('analytics-search').addEventListener('input', (e) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            viewState.searchQuery = e.target.value;
-            viewState.currentPage = 1; // Reset page on search
-            renderActiveTable(dataMap);
-        }, 300); // 300ms delay
-    });
+    const searchInput = document.getElementById('analytics-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                viewState.searchQuery = e.target.value;
+                viewState.currentPage = 1;
+                renderActiveTable(dataMap);
+            }, 300);
+        });
+    }
 
-    // Sorting
-    document.getElementById('view-container').addEventListener('click', (e) => {
-        const th = e.target.closest('th[data-sort]');
-        if (th) {
-            const col = th.dataset.sort;
-            const tab = viewState.activeTab;
-            if (viewState.sort[tab].column === col) {
-                viewState.sort[tab].direction = viewState.sort[tab].direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                viewState.sort[tab].column = col;
-                viewState.sort[tab].direction = 'asc';
+    // 3. Sorting (FIXED: Attached to the inner container which is reset on render)
+    const mainContainer = document.getElementById('analytics-main-container');
+    if (mainContainer) {
+        mainContainer.addEventListener('click', (e) => {
+            // Check for sort header click
+            const th = e.target.closest('th[data-sort]');
+            if (th) {
+                const col = th.dataset.sort;
+                const tab = viewState.activeTab;
+                if (viewState.sort[tab].column === col) {
+                    viewState.sort[tab].direction = viewState.sort[tab].direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    viewState.sort[tab].column = col;
+                    viewState.sort[tab].direction = 'asc';
+                }
+                // Reset to page 1 when sorting so user doesn't miss data
+                viewState.currentPage = 1;
+                renderActiveTable(dataMap);
             }
-            renderActiveTable(dataMap);
-        }
-    });
+        });
+    }
 }
 
 // --- TABLE GENERATORS ---
@@ -360,11 +356,11 @@ function generateMismatchesTable(data) {
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <thead style="background: var(--color-background);">
         <tr>
-            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
-            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
-            <th data-sort="sheetQty" style="padding: 12px; text-align: right; cursor: pointer;">Sheet <span class="material-icons sort-icon">${getSortIcon(tab, 'sheetQty')}</span></th>
-            <th data-sort="wooQty" style="padding: 12px; text-align: right; cursor: pointer;">Woo <span class="material-icons sort-icon">${getSortIcon(tab, 'wooQty')}</span></th>
-            <th data-sort="difference" style="padding: 12px; text-align: right; cursor: pointer;">Diff <span class="material-icons sort-icon">${getSortIcon(tab, 'difference')}</span></th>
+            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
+            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
+            <th data-sort="sheetQty" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Sheet <span class="material-icons sort-icon">${getSortIcon(tab, 'sheetQty')}</span></th>
+            <th data-sort="wooQty" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Woo <span class="material-icons sort-icon">${getSortIcon(tab, 'wooQty')}</span></th>
+            <th data-sort="difference" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Diff <span class="material-icons sort-icon">${getSortIcon(tab, 'difference')}</span></th>
         </tr>
       </thead>
       <tbody>
@@ -392,10 +388,10 @@ function generateSheetOnlyTable(data) {
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <thead style="background: var(--color-background);">
         <tr>
-            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
-            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
-            <th data-sort="qty" style="padding: 12px; text-align: right; cursor: pointer;">Qty <span class="material-icons sort-icon">${getSortIcon(tab, 'qty')}</span></th>
-            <th data-sort="category" style="padding: 12px; text-align: left; cursor: pointer;">Category <span class="material-icons sort-icon">${getSortIcon(tab, 'category')}</span></th>
+            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
+            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
+            <th data-sort="qty" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Qty <span class="material-icons sort-icon">${getSortIcon(tab, 'qty')}</span></th>
+            <th data-sort="category" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">Category <span class="material-icons sort-icon">${getSortIcon(tab, 'category')}</span></th>
         </tr>
       </thead>
       <tbody>
@@ -418,10 +414,10 @@ function generateWooOnlyTable(data) {
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
       <thead style="background: var(--color-background);">
         <tr>
-            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
-            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
-            <th data-sort="qty" style="padding: 12px; text-align: right; cursor: pointer;">Qty <span class="material-icons sort-icon">${getSortIcon(tab, 'qty')}</span></th>
-            <th data-sort="price" style="padding: 12px; text-align: right; cursor: pointer;">Price <span class="material-icons sort-icon">${getSortIcon(tab, 'price')}</span></th>
+            <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
+            <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer; user-select: none;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
+            <th data-sort="qty" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Qty <span class="material-icons sort-icon">${getSortIcon(tab, 'qty')}</span></th>
+            <th data-sort="price" style="padding: 12px; text-align: right; cursor: pointer; user-select: none;">Price <span class="material-icons sort-icon">${getSortIcon(tab, 'price')}</span></th>
         </tr>
       </thead>
       <tbody>

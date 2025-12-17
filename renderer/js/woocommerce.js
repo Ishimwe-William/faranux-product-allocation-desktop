@@ -32,10 +32,10 @@ export async function fetchWooProducts() {
 
             const products = response.data;
 
-            // Filter out private products
+            // UPDATED: Filter strictly for 'publish' status and 'visible' catalog visibility
             const publicProducts = products.filter(product =>
-                product.status !== 'private' &&
-                product.catalog_visibility !== 'hidden'
+                product.status === 'publish' &&
+                product.catalog_visibility === 'visible'
             );
 
             allProducts = allProducts.concat(publicProducts);
@@ -85,11 +85,11 @@ export function matchProductsBySKU(sheetProducts, wooProducts) {
         const sku = sheetProduct.sku?.trim();
         if (!sku) return;
 
-        // Find matching WooCommerce product (excluding private products)
+        // UPDATED: Find matching WooCommerce product with strict visibility checks
         const wooProduct = wooProducts.find(wp =>
             wp.sku?.trim() === sku &&
-            wp.status !== 'private' &&
-            wp.catalog_visibility !== 'hidden'
+            wp.status === 'publish' &&
+            wp.catalog_visibility === 'visible'
         );
 
         matched.push({
