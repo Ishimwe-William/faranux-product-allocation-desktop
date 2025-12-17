@@ -1,7 +1,8 @@
 {
   "name": "faranux-product-allocation",
+  "productName": "Inventory Manager",
   "appId": "com.bunsenplus.fxproductallocation",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Desktop application for product allocation management",
   "icon": "./assets/icon.png",
   "main": "main.js",
@@ -10,7 +11,8 @@
     "dev": "electron . --debug",
     "dist": "electron-builder --win",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "clean": "rimraf dist"
   },
   "keywords": [
     "inventory",
@@ -19,18 +21,32 @@
   ],
   "build": {
     "appId": "com.bunsenplus.fxproductallocation",
+    "compression": "normal",
     "win": {
       "target": "nsis",
-      "icon": "buildResources/icon.ico"
+      "icon": "buildResources/logo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "buildResources/logo.ico",
+      "uninstallerIcon": "buildResources/logo.ico",
+      "installerHeaderIcon": "buildResources/logo.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Inventory Manager",
+      "installerSidebar": "buildResources/installerSidebar.bmp",
+      "differentialPackage": false
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "buildResources"
     },
     "mac": {
       "icon": "buildResources/icon.icns"
     },
     "linux": {
-      "icon": "buildResources/icon.png"
-    },
-    "directories": {
-      "output": "dist"
+      "icon": "buildResources/logo.png"
     }
   },
   "author": "Bunsenplus",

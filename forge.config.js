@@ -3,26 +3,48 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
   packagerConfig: {
-    icon: './assets/icons/icon',
+    name: 'Inventory Manager',
+    executableName: 'inventory-manager',
+    icon: './buildResources/logo',
     asar: true,
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        name: 'inventory_manager',
+        setupIcon: './buildResources/logo.ico',
+        loadingGif: './buildResources/installer.gif',
+        noMsi: true
+      },
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      platforms: ['darwin', 'win32'],
+      config: {
+        name: 'InventoryManager'
+      }
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          name: 'inventory-manager',
+          productName: 'Inventory Manager',
+          icon: './buildResources/logo.png'
+        }
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          name: 'inventory-manager',
+          productName: 'Inventory Manager',
+          icon: './buildResources/logo.png'
+        }
+      },
     },
   ],
   plugins: [

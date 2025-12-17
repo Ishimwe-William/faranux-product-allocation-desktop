@@ -45,7 +45,7 @@ const COLUMN_MAPPINGS = {
     product_name: ['product_name', 'item', 'name', 'product', 'item_name', 'product name', 'item name'],
     sku: ['sku', 'item_code', 'product_code', 'item code', 'product code', 'part_number', 'part number'],
     serial_number: ['s/n', 'sn', 'serial', 'no', 'number', '#', 'index'],
-    quantity: ['quantity', 'qty', 'stock', 'amount', 'count', 'inv', 'inventory'],
+    quantity: ['quantity','total quantity', 'total qty', 'qty', 'stock', 'amount', 'count', 'inv', 'inventory'],
     category: ['category', 'type', 'group', 'class', 'classification'],
     description: ['description', 'desc', 'details', 'notes', 'info'],
     branch: ['branch', 'location', 'store', 'warehouse', 'site'],

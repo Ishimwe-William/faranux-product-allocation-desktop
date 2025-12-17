@@ -31,7 +31,14 @@ export async function fetchWooProducts() {
             if (!response.success) throw new Error(response.error);
 
             const products = response.data;
-            allProducts = allProducts.concat(products);
+
+            // Filter out private products
+            const publicProducts = products.filter(product =>
+                product.status !== 'private' &&
+                product.catalog_visibility !== 'hidden'
+            );
+
+            allProducts = allProducts.concat(publicProducts);
 
             // If response includes headers for total, use them. Otherwise just show count.
             const total = response.headers ? parseInt(response.headers['x-wp-total']) : 0;
@@ -78,7 +85,12 @@ export function matchProductsBySKU(sheetProducts, wooProducts) {
         const sku = sheetProduct.sku?.trim();
         if (!sku) return;
 
-        const wooProduct = wooProducts.find(wp => wp.sku?.trim() === sku);
+        // Find matching WooCommerce product (excluding private products)
+        const wooProduct = wooProducts.find(wp =>
+            wp.sku?.trim() === sku &&
+            wp.status !== 'private' &&
+            wp.catalog_visibility !== 'hidden'
+        );
 
         matched.push({
             sku: sku,

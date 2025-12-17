@@ -27,7 +27,7 @@ let viewState = {
 };
 
 const STYLES = {
-    cyan: '#64ffda',
+    cyan: '#7ad181',
     red: '#ff5c5c',
     text: 'var(--color-text)',
     muted: 'var(--color-text-tertiary)'
@@ -171,11 +171,14 @@ export function renderAnalyticsView() {
         syncHtml = `
             <div class="card" style="margin-bottom: 20px; border-left: 4px solid var(--color-primary);">
                 <div style="padding: 12px;">
-                    <span style="display:flex; align-items:center; gap:8px; font-weight:500;">
-                        <span class="material-icons spin">sync</span> Syncing... ${Math.round(pct)}%
-                    </span>
-                    <div style="height:4px; background:var(--color-bg-tertiary); margin-top:8px; border-radius:2px;">
-                        <div style="height:100%; background:var(--color-primary); width:${pct}%"></div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-weight:500;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <span class="material-icons" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>
+                            Syncing WooCommerce Products...
+                        </span>
+                    </div>
+                    <div style="height: 6px; background: var(--color-background); border-radius: 3px; overflow: hidden;">
+                        <div style="height: 100%; background: var(--color-primary); width: ${total ? percentage + '%' : '30%'}; transition: width 0.3s ease; ${!total ? 'animation: indeterminate 1.5s infinite linear;' : ''}"></div>
                     </div>
                 </div>
             </div>`;
@@ -200,7 +203,7 @@ export function renderAnalyticsView() {
       <div class="analytics-summary">
         <div class="card analytics-stat-card">
           <div class="stat-icon" style="background: ${STYLES.cyan}15;"><span class="material-icons" style="color: ${STYLES.cyan}">check_circle</span></div>
-          <div class="stat-content"><div class="stat-value" style="color: ${STYLES.cyan}">${formatQuantity(perfectMatches.length)}</div><div class="stat-label">Perfect</div></div>
+          <div class="stat-content"><div class="stat-value">${formatQuantity(perfectMatches.length)}</div><div class="stat-label">Perfect</div></div>
         </div>
         <div class="card analytics-stat-card">
             <div class="stat-icon" style="background: var(--color-warning)15;"><span class="material-icons" style="color: var(--color-warning)">sync_problem</span></div>
@@ -225,7 +228,7 @@ export function renderAnalyticsView() {
           <div style="position: relative; width: 300px;">
             <span class="material-icons" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-tertiary);">search</span>
             <input type="text" id="analytics-search" placeholder="Search..." value="${viewState.searchQuery}" 
-                   style="width: 100%; padding: 8px 8px 8px 36px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg-card); color: var(--color-text-primary);">
+                   style="width: 100%; padding: 8px 8px 8px 36px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-background); color: var(--color-text);">
           </div>
       </div>
 
@@ -272,7 +275,7 @@ function renderActiveTable(dataMap) {
 
     // 5. Generate Pagination Controls
     const paginationHtml = totalItems > 0 ? `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border); background: var(--color-bg-card);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border); background: var(--color-background);">
             <div style="color: var(--color-text-secondary); font-size: 0.9rem;">
                 Showing <strong>${startIdx + 1}-${Math.min(startIdx + viewState.itemsPerPage, totalItems)}</strong> of <strong>${totalItems}</strong>
             </div>
@@ -355,7 +358,7 @@ function generateMismatchesTable(data) {
     const tab = 'mismatches';
     return `
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-      <thead style="background: var(--color-bg-tertiary);">
+      <thead style="background: var(--color-background);">
         <tr>
             <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
             <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
@@ -387,7 +390,7 @@ function generateSheetOnlyTable(data) {
     const tab = 'sheet-only';
     return `
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-      <thead style="background: var(--color-bg-tertiary);">
+      <thead style="background: var(--color-background);">
         <tr>
             <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
             <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
@@ -413,7 +416,7 @@ function generateWooOnlyTable(data) {
     const tab = 'woo-only';
     return `
     <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
-      <thead style="background: var(--color-bg-tertiary);">
+      <thead style="background: var(--color-background);">
         <tr>
             <th data-sort="sku" style="padding: 12px; text-align: left; cursor: pointer;">SKU <span class="material-icons sort-icon">${getSortIcon(tab, 'sku')}</span></th>
             <th data-sort="name" style="padding: 12px; text-align: left; cursor: pointer;">Product <span class="material-icons sort-icon">${getSortIcon(tab, 'name')}</span></th>
