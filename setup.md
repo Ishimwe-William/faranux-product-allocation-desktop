@@ -1,18 +1,26 @@
 ## Generate New Release
 
 ```bash
-    # 1. Check what files are uncommitted
-    git status
-    
-    # 2. Add all changes
-    git add .
-    
-    # 3. Commit the changes
-    git commit -m "Setup automated releases and update configuration"
-    
-    # 4. Now run the release
-    npm run release
+
+# 1. Check what files are uncommitted
+git status
 ```
+
+```bash
+# 2. Add all changes
+git add .
+```
+
+```bash
+# 3. Commit the changes
+git commit -m "Setup automated releases and update configuration"
+```    
+
+```bash
+# 4. Now run the release
+npm run release
+```
+
 ### What This Will Do:
 
     ✅ Commit your current changes
