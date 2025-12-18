@@ -40,13 +40,10 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "buildResources/logo.ico",
-      "publisherName": "Bunsenplus",
       "verifyUpdateCodeSignature": false
     },
     "nsis": {
