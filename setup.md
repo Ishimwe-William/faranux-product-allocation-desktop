@@ -24,7 +24,7 @@ npm run release
 ### What This Will Do:
 
     ✅ Commit your current changes
-    ✅ Bump version from 1.0.4 to 1.0.5
+    ✅ Bump version from 1.0.x to 1.0.x+1
     ✅ Create a commit with the version bump
     ✅ Create a git tag v1.0.5
     ✅ Push both commits and tags to GitHub

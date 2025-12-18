@@ -11,13 +11,15 @@ import {showCustomAlert, showCustomConfirm} from '../components/modal.js';
 export function renderSettingsView() {
     const versionPromise = (async () => {
         try {
-            if (window.electronAPI && window.electronAPI.getEnv) {
-                const env = await window.electronAPI.getEnv();
-                return env?.APP_VERSION;
+            // ✅ UPDATED: Call getAppVersion() directly
+            if (window.electronAPI && window.electronAPI.getAppVersion) {
+                const version = await window.electronAPI.getAppVersion();
+                return version || 'Unknown';
             }
-            return '1.0.1';
+            return '1.0.0'; // Fallback
         } catch (e) {
-            return '1.0.1';
+            console.error('Failed to get version:', e);
+            return '1.0.0';
         }
     })();
 

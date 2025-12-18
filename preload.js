@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getEnv: () => ipcRenderer.invoke('get-env'),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     wooRequest: (params) => ipcRenderer.invoke('woo-request', params),
+    loginGoogle: (clientId) => ipcRenderer.invoke('login-google', clientId),
     platform: process.platform,
 
     // Auto-updater methods

@@ -127,17 +127,40 @@ export async function signInWithGoogle() {
     try {
         if (!auth) throw new Error('Firebase not initialized.');
 
-        const result = await auth.signInWithPopup(googleProvider);
+        // 1. Get Client ID from Environment
+        // You can also hardcode it here for testing if you haven't set up .env yet
+        const env = await window.electronAPI.getEnv();
+        const clientId = env.GOOGLE_CLIENT_ID;
 
-        const credential = result.credential;
-        const token = credential.accessToken;
+        if (!clientId) {
+            throw new Error('Google Client ID is missing in .env configuration');
+        }
 
-        store.setGoogleToken(token);
+        // 2. Trigger System Browser Login via Main Process
+        // This opens Chrome, user logs in, and Main process returns the tokens
+        const tokens = await window.electronAPI.loginGoogle(clientId);
+
+        if (!tokens || !tokens.id_token) {
+            throw new Error('Failed to receive tokens from Google Login');
+        }
+
+        // 3. Create Firebase Credential using the manual tokens
+        const credential = firebase.auth.GoogleAuthProvider.credential(
+            tokens.id_token,
+            tokens.access_token
+        );
+
+        // 4. Sign in to Firebase with that credential
+        const result = await auth.signInWithCredential(credential);
+
+        // 5. Store token for Sheet access (same as before)
+        store.setGoogleToken(tokens.access_token);
 
         return result.user;
+
     } catch (error) {
         console.error('Google Sign In Error:', error);
-        throw formatAuthError(error);
+        throw error; // This will be caught by auth.js and shown in the UI
     }
 }
 
