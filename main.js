@@ -5,10 +5,12 @@ const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const AppUpdater = require('./updater');
 require('dotenv').config();
 
 let mainWindow;
 let server;
+let appUpdater;
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -113,6 +115,14 @@ async function createWindow() {
 
   // Setup context menu for right-click
   setupContextMenu();
+
+  // Initialize auto-updater after window is ready
+  appUpdater = new AppUpdater(mainWindow);
+
+  // Check for updates on startup (after 3 seconds delay)
+  setTimeout(() => {
+    appUpdater.checkForUpdates();
+  }, 3000);
 }
 
 function setupContextMenu() {
@@ -265,6 +275,14 @@ ipcMain.handle('open-external', async (event, url) => {
     console.error('Error opening external URL:', error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle('check-for-updates', async () => {
+  if (appUpdater) {
+    appUpdater.checkForUpdates();
+    return { success: true };
+  }
+  return { success: false, error: 'Updater not initialized' };
 });
 
 ipcMain.handle('woo-request', async (event, { siteUrl, consumerKey, consumerSecret, endpoint, method = 'GET' }) => {

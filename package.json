@@ -12,19 +12,42 @@
     "dist": "electron-builder --win",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "publish": "electron-builder --win --publish always"
   },
   "keywords": [
     "inventory",
     "management",
     "electron"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ishimwe-William/faranux-product-allocation-desktop.git"
+  },
   "build": {
     "appId": "com.bunsenplus.fxproductallocation",
     "compression": "normal",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Ishimwe-William",
+        "repo": "faranux-product-allocation-desktop",
+        "private": false,
+        "releaseType": "release"
+      }
+    ],
     "win": {
-      "target": "nsis",
-      "icon": "buildResources/logo.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "buildResources/logo.ico",
+      "publisherName": "Bunsenplus",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -36,24 +59,29 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Inventory Manager",
       "installerSidebar": "buildResources/installerSidebar.bmp",
-      "differentialPackage": false
+      "differentialPackage": true,
+      "deleteAppDataOnUninstall": false
     },
     "directories": {
       "output": "dist",
       "buildResources": "buildResources"
     },
     "mac": {
-      "icon": "buildResources/icon.icns"
+      "icon": "buildResources/icon.icns",
+      "category": "public.app-category.business"
     },
     "linux": {
-      "icon": "buildResources/logo.png"
+      "icon": "buildResources/logo.png",
+      "category": "Office"
     }
   },
   "author": "Bunsenplus",
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.6.1",
-    "electron-squirrel-startup": "^1.0.1"
+    "electron-log": "^5.4.3",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
