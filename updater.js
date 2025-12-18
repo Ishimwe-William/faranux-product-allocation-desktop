@@ -12,6 +12,7 @@ autoUpdater.logger = log;
 class AppUpdater {
     constructor(mainWindow) {
         this.mainWindow = mainWindow;
+        this.manualCheck = false; // Track if user manually checked for updates
         this.setupAutoUpdater();
     }
 
@@ -23,7 +24,7 @@ class AppUpdater {
         // Event handlers
         autoUpdater.on('checking-for-update', () => {
             log.info('Checking for updates...');
-            this.sendStatusToWindow('Checking for updates...');
+            this.sendStatusToWindow('checking-for-update');
         });
 
         autoUpdater.on('update-available', (info) => {
@@ -46,23 +47,49 @@ class AppUpdater {
         });
 
         autoUpdater.on('update-not-available', (info) => {
-            log.info('Update not available:', info.version);
+            log.info('Update not available. Current version:', info.version);
             this.sendStatusToWindow('update-not-available', info);
+
+            // Only show dialog if user manually checked for updates
+            if (this.manualCheck) {
+                dialog.showMessageBox(this.mainWindow, {
+                    type: 'info',
+                    title: 'No Updates',
+                    message: 'You are running the latest version!',
+                    buttons: ['OK']
+                });
+                this.manualCheck = false;
+            }
         });
 
         autoUpdater.on('error', (err) => {
             log.error('Error in auto-updater:', err);
             this.sendStatusToWindow('error', err);
 
-            dialog.showErrorBox(
-                'Update Error',
-                `An error occurred while checking for updates: ${err.message}`
-            );
+            // Don't show error dialog for common network errors on automatic checks
+            const isNetworkError = err.message.includes('HttpError: 404') ||
+                err.message.includes('Cannot parse releases feed') ||
+                err.message.includes('ENOTFOUND') ||
+                err.message.includes('ECONNREFUSED');
+
+            // Only show error dialog if:
+            // 1. User manually checked for updates, OR
+            // 2. It's not a network error
+            if (this.manualCheck || !isNetworkError) {
+                dialog.showErrorBox(
+                    'Update Error',
+                    `An error occurred while checking for updates: ${err.message}`
+                );
+            } else {
+                log.warn('Automatic update check failed (this is normal if no releases exist yet)');
+            }
+
+            this.manualCheck = false;
         });
 
         autoUpdater.on('download-progress', (progressObj) => {
             let message = `Download speed: ${progressObj.bytesPerSecond}`;
-            message += ` - Downloaded ${progressObj.percent}%`;
+            message += ` - Downloaded ${progressObj.percent.toFixed(1)}%`;
             message += ` (${progressObj.transferred}/${progressObj.total})`;
 
             log.info(message);
@@ -95,11 +122,13 @@ class AppUpdater {
         }
     }
 
-    checkForUpdates() {
+    checkForUpdates(manual = false) {
+        this.manualCheck = manual;
         autoUpdater.checkForUpdates();
     }
 
     checkForUpdatesAndNotify() {
+        this.manualCheck = true;
         autoUpdater.checkForUpdatesAndNotify();
     }
 }

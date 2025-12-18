@@ -33,9 +33,6 @@ yarn-error.log*
 .npm
 .eslintcache
 
-# Optional npm cache directory
-.npm
-
 # Optional REPL history
 .node_repl_history
 
@@ -58,3 +55,48 @@ coverage
 # Temporary files
 *.tmp
 *.temp
+
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+build/
+
+# Environment variables
+.env.local
+.env.*.local
+
+# Logs
+logs/
+lerna-debug.log*
+
+# OS Files
+Thumbs.db
+desktop.ini
+
+# IDE
+*~
+
+# Electron
+.webpack/
+
+# Package files (don't commit installers)
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.zip
+*.blockmap
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+temp/
+tmp/

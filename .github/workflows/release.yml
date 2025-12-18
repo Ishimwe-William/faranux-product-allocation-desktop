@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'  # Triggers on version tags like v1.0.0
 
+# Required permissions for creating releases
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: windows-latest
@@ -22,26 +26,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create .env file
+        run: |
+          echo "EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}" >> .env
+          echo "EXPO_PUBLIC_GSHEETS_API_KEY=${{ secrets.EXPO_PUBLIC_GSHEETS_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_GSHEET_ID=${{ secrets.EXPO_PUBLIC_GSHEET_ID }}" >> .env
+          echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
+          echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
+          echo "DEBUG=false" >> .env
+          echo "LOG_LEVEL=info" >> .env
+        shell: bash
+
       - name: Build and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Add your environment variables here
-          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
-          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
-          EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}}
-          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID}}
-          EXPO_PUBLIC_GSHEETS_API_KEY: ${{ secrets.EXPO_PUBLIC_GSHEETS_API_KEY}}
-          EXPO_PUBLIC_GSHEET_ID: ${{ secrets.EXPO_PUBLIC_GSHEET_ID }}
-          CONSUMER_KEY: ${{ secrets.CONSUMER_KEY }}
-          CONSUMER_SECRET: ${{ secrets.CONSUMER_SECRET }}
         run: npm run publish
 
-      - name: Upload artifacts
+      - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: windows-installer
           path: |
             dist/*.exe
             dist/*.yml
+            dist/*.blockmap
+          retention-days: 30

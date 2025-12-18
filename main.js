@@ -279,7 +279,8 @@ ipcMain.handle('open-external', async (event, url) => {
 
 ipcMain.handle('check-for-updates', async () => {
   if (appUpdater) {
-    appUpdater.checkForUpdates();
+    // Pass true to indicate this is a manual check
+    appUpdater.checkForUpdates(true);
     return { success: true };
   }
   return { success: false, error: 'Updater not initialized' };
