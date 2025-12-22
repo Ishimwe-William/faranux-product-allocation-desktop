@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="css/modal.css">
     <link rel="stylesheet" href="css/analytics.css">
     <link rel="stylesheet" href="css/contextMenu.css">
+    <link rel="stylesheet" href="css/notifications.css">
 
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -97,6 +98,10 @@
                     <span class="material-icons">search</span>
                     <span>Products</span>
                 </a>
+                <a href="#/notifications" class="nav-item notification-badge" data-route="notifications" data-count="0">
+                    <span class="material-icons">notifications</span>
+                    <span>Notifications</span>
+                </a>
                 <a href="#/settings" class="nav-item" data-route="settings">
                     <span class="material-icons">settings</span>
                     <span>Settings</span>
@@ -128,6 +133,9 @@
                     </div>
                 </div>
                 <div class="top-bar-actions">
+                    <button class="btn btn-icon notification-badge" id="notification-btn" data-count="0" title="Notifications">
+                        <span class="material-icons">notifications</span>
+                    </button>
                     <button class="btn btn-icon" id="sync-btn" title="Sync Data">
                         <span class="material-icons">sync</span>
                     </button>

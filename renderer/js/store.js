@@ -10,6 +10,8 @@ export class Store {
                 isAuthenticated: false,
                 googleAccessToken: null
             },
+            notifications: [],
+            notificationCount: 0,
             shelves: {
                 items: [],
                 loading: false,
@@ -183,6 +185,15 @@ export class Store {
         this.setState({
             products: {...this.state.products, error, loading: false}
         });
+    }
+    setNotifications(notifications) {
+        this.state.notifications = notifications;
+        this.notify();
+    }
+
+    setNotificationCount(count) {
+        this.state.notificationCount = count;
+        this.notify();
     }
 
     // WooCommerce actions

@@ -12,30 +12,41 @@ window.addEventListener('unhandledrejection', (event) => {
     showErrorScreen('Unhandled Promise Rejection', event.reason?.message || String(event.reason));
 });
 
-import { store } from './store.js';
-import { router } from './router.js';
-import { initializeFirebase, signIn, signUp, signOut } from './firebase.js';
-import { fetchProducts, fetchLocations, buildShelves } from './googleSheets.js';
-import { fetchWooProducts } from './woocommerce.js';
-import { initContextMenu } from './contextMenu.js';
+import {store} from './store.js';
+import {router} from './router.js';
+import {initializeFirebase, signIn, signUp, signOut} from './firebase.js';
+import {fetchProducts, fetchLocations, buildShelves} from './googleSheets.js';
+import {fetchWooProducts} from './woocommerce.js';
+import {initContextMenu} from './contextMenu.js';
 
-import { renderShelvesView } from './views/shelves.js';
-import { renderShelfDetailView } from './views/shelfDetail.js';
-import { renderBoxDetailView } from './views/boxDetail.js';
-import { renderProductsView } from './views/products.js';
-import { renderSettingsView } from './views/settings.js';
-import { renderDiagnosticsView } from './views/diagnostics.js';
-import { renderWooSettingsView } from './views/wooSettings.js';
-import { renderAnalyticsView } from './views/analytics.js';
-import { setupAuthHandlers as initAuthHandlers, showAuthScreen, hideAuthScreen, resetAuthForm, updateUserDisplay } from './views/auth.js';
+import {renderShelvesView} from './views/shelves.js';
+import {renderShelfDetailView} from './views/shelfDetail.js';
+import {renderBoxDetailView} from './views/boxDetail.js';
+import {renderProductsView} from './views/products.js';
+import {renderSettingsView} from './views/settings.js';
+import {renderDiagnosticsView} from './views/diagnostics.js';
+import {renderWooSettingsView} from './views/wooSettings.js';
+import {renderAnalyticsView} from './views/analytics.js';
+import {
+    setupAuthHandlers as initAuthHandlers,
+    showAuthScreen,
+    hideAuthScreen,
+    resetAuthForm,
+    updateUserDisplay
+} from './views/auth.js';
 
-import { showCustomConfirm } from './components/modal.js';
+import {notificationService} from './notifications.js';
+import {renderNotificationCenter} from './views/notifications.js';
+import { subscribeToConfig } from './firebase.js';
+
+import {showCustomConfirm} from './components/modal.js';
 
 let authScreen, appContainer, authForm, authError;
 let loadingOverlay, loadingText;
 
 let wasAuthenticated = false;
 let prevState = null;
+let unsubscribeConfig = null;
 
 async function initApp() {
     authScreen = document.getElementById('auth-screen');
@@ -48,7 +59,7 @@ async function initApp() {
     showLoading('Initializing...');
 
     try {
-        await initializeFirebase();
+        const {auth, db} = await initializeFirebase();
         initContextMenu();
 
         prevState = store.getState();
@@ -59,6 +70,58 @@ async function initApp() {
         registerRoutes();
 
         await loadInitialData();
+
+        // Setup auth state listener with notification initialization
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                store.setUser({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL
+                });
+
+                // Initialize notification service
+                try {
+                    await notificationService.initialize(db, user.uid);
+                    console.log('[App] Notification service initialized');
+                } catch (err) {
+                    console.error('[App] Failed to initialize notifications:', err);
+                }
+
+                // --- FIX 2: Correct usage of unsubscribeConfig ---
+                if (unsubscribeConfig) {
+                    unsubscribeConfig();
+                }
+
+                // Remove 'const' here so we update the global variable
+                unsubscribeConfig = subscribeToConfig((config) => {
+                    // Config updates handled automatically via store
+                });
+
+                await loadInitialData();
+                wasAuthenticated = true;
+                showApp();
+
+                if (window.location.hash === '' || window.location.hash === '#/') {
+                    router.navigate('/shelves');
+                }
+
+            } else {
+                notificationService.cleanup();
+                store.setUser(null);
+                store.setGoogleToken(null);
+
+                // --- FIX 3: Cleanup correctly ---
+                if (unsubscribeConfig) {
+                    unsubscribeConfig();
+                    unsubscribeConfig = null;
+                }
+
+                wasAuthenticated = false;
+                showAuth();
+            }
+        });
 
         try {
             const theme = store.getState().display?.theme || 'system';
@@ -110,7 +173,7 @@ function setupAppHandlers() {
         sidebarToggle.addEventListener('click', () => {
             const state = store.getState();
             const newCollapsedState = !state.display.sidebarCollapsed;
-            store.setDisplaySettings({ sidebarCollapsed: newCollapsedState });
+            store.setDisplaySettings({sidebarCollapsed: newCollapsedState});
             updateSidebarUI(newCollapsedState);
         });
     }
@@ -124,6 +187,14 @@ function setupAppHandlers() {
             }
         });
     });
+
+    // Notification button handler
+    const notificationBtn = document.getElementById('notification-btn');
+    if (notificationBtn) {
+        notificationBtn.addEventListener('click', () => {
+            router.navigate('/notifications');
+        });
+    }
 
     document.getElementById('sync-btn').addEventListener('click', async () => {
         await loadAllData();
@@ -147,6 +218,7 @@ function registerRoutes() {
     router.register('/box', renderBoxDetailView);
     router.register('/products', renderProductsView);
     router.register('/analytics', renderAnalyticsView);
+    router.register('/notifications', renderNotificationCenter);
     router.register('/settings', renderSettingsView);
     router.register('/settings/diagnostics', renderDiagnosticsView);
     router.register('/settings/woocommerce', renderWooSettingsView);
@@ -174,22 +246,46 @@ function handleStateChange(state) {
         const syncTime = document.getElementById('sync-time');
         if (syncTime) {
             const date = new Date(lastSync);
-            syncTime.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            syncTime.textContent = date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
         }
     }
 
-    // 1. Update Sidebar Progress
+    // Handle notification badge
+    if (state.notificationCount !== undefined) {
+        const topBarBadge = document.querySelector('#notification-btn');
+        const sidebarBadge = document.querySelector('.nav-item[data-route="notifications"]');
+
+        if (topBarBadge) {
+            topBarBadge.setAttribute('data-count', state.notificationCount);
+        }
+        if (sidebarBadge) {
+            sidebarBadge.setAttribute('data-count', state.notificationCount);
+        }
+    }
+
+    // Update Sidebar Progress
     updateSidebarSyncStatus(state.woocommerce);
 
-    // 2. Refresh active view if data changes
+    // Refresh active view if data changes
     try {
         const prevShelvesCount = prevState?.shelves?.items?.length || 0;
         const newShelvesCount = state?.shelves?.items?.length || 0;
+
         const prevWooCount = prevState?.woocommerce?.products?.length || 0;
         const newWooCount = state?.woocommerce?.products?.length || 0;
+
+        // FIX 2: Add Notification Count Check
+        const prevNotifCount = prevState?.notifications?.length || 0;
+        const newNotifCount = state?.notifications?.length || 0;
+
         const wooLoadingChanged = prevState?.woocommerce?.loading !== state?.woocommerce?.loading;
 
-        if (prevShelvesCount !== newShelvesCount || prevWooCount !== newWooCount || wooLoadingChanged) {
+        // Add the notification check to the condition
+        if (prevShelvesCount !== newShelvesCount ||
+            prevWooCount !== newWooCount ||
+            prevNotifCount !== newNotifCount || // <--- Added this check
+            wooLoadingChanged) {
+
             if (router && typeof router.handleRoute === 'function') {
                 router.handleRoute();
             }
@@ -211,7 +307,7 @@ function updateSidebarSyncStatus(wooState) {
 
     if (wooState && wooState.loading) {
         // Calculate percentage if total is known, otherwise indeterminate
-        const { count, total } = wooState.progress || { count: 0, total: 0 };
+        const {count, total} = wooState.progress || {count: 0, total: 0};
         const width = total > 0 ? (count / total) * 100 : 100;
         const isIndeterminate = !total || total === 0;
 
@@ -325,7 +421,7 @@ function showErrorScreen(title, message) {
     console.error(`[Error Screen] ${title}: ${message}`);
 }
 
-export { showLoading, hideLoading };
+export {showLoading, hideLoading};
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);

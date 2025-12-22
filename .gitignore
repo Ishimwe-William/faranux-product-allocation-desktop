@@ -100,3 +100,4 @@ coverage/
 .cache/
 temp/
 tmp/
+/firebase-service-account.json
