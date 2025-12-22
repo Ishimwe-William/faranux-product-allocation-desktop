@@ -29,3 +29,11 @@ npm run release
     ✅ Create a git tag v1.0.5
     ✅ Push both commits and tags to GitHub
     ✅ Trigger GitHub Actions to build and publish
+
+
+
+| Script | Version Bump |Description |
+--------------------------------------
+- Release | Patch | (0.0.x)
+- release:minor | Minor (0.x.0) | For new, backwards-compatible functionality.
+- release:major | Major (x.0.0) | For incompatible API changes.,
