@@ -241,6 +241,7 @@ app.on('activate', () => {
     }
 });
 
+
 // IPC Handlers
 ipcMain.handle('get-env', () => {
     return {
