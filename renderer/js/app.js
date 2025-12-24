@@ -69,9 +69,6 @@ async function initApp() {
         setupAppHandlers();
         registerRoutes();
 
-        await loadInitialData();
-
-        // Setup auth state listener with notification initialization
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 store.setUser({
@@ -81,7 +78,6 @@ async function initApp() {
                     photoURL: user.photoURL
                 });
 
-                // Initialize notification service
                 try {
                     await notificationService.initialize(db, user.uid);
                     console.log('[App] Notification service initialized');
@@ -89,12 +85,10 @@ async function initApp() {
                     console.error('[App] Failed to initialize notifications:', err);
                 }
 
-                // --- FIX 2: Correct usage of unsubscribeConfig ---
                 if (unsubscribeConfig) {
                     unsubscribeConfig();
                 }
 
-                // Remove 'const' here so we update the global variable
                 unsubscribeConfig = subscribeToConfig((config) => {
                     // Config updates handled automatically via store
                 });
@@ -112,7 +106,6 @@ async function initApp() {
                 store.setUser(null);
                 store.setGoogleToken(null);
 
-                // --- FIX 3: Cleanup correctly ---
                 if (unsubscribeConfig) {
                     unsubscribeConfig();
                     unsubscribeConfig = null;
@@ -188,7 +181,6 @@ function setupAppHandlers() {
         });
     });
 
-    // Notification button handler
     const notificationBtn = document.getElementById('notification-btn');
     if (notificationBtn) {
         notificationBtn.addEventListener('click', () => {
@@ -250,23 +242,31 @@ function handleStateChange(state) {
         }
     }
 
-    // Handle notification badge
+    // Handle notification badge (both UI and taskbar)
     if (state.notificationCount !== undefined) {
+        const count = state.notificationCount;
+
+        // Update UI badges
         const topBarBadge = document.querySelector('#notification-btn');
         const sidebarBadge = document.querySelector('.nav-item[data-route="notifications"]');
 
         if (topBarBadge) {
-            topBarBadge.setAttribute('data-count', state.notificationCount);
+            topBarBadge.setAttribute('data-count', count);
         }
         if (sidebarBadge) {
-            sidebarBadge.setAttribute('data-count', state.notificationCount);
+            sidebarBadge.setAttribute('data-count', count);
+        }
+
+        // Update taskbar/dock badge
+        if (window.electronAPI && window.electronAPI.setBadgeCount) {
+            window.electronAPI.setBadgeCount(count).catch(err => {
+                console.warn('[App] Failed to set badge count:', err);
+            });
         }
     }
 
-    // Update Sidebar Progress
     updateSidebarSyncStatus(state.woocommerce);
 
-    // Refresh active view if data changes
     try {
         const prevShelvesCount = prevState?.shelves?.items?.length || 0;
         const newShelvesCount = state?.shelves?.items?.length || 0;
@@ -274,16 +274,14 @@ function handleStateChange(state) {
         const prevWooCount = prevState?.woocommerce?.products?.length || 0;
         const newWooCount = state?.woocommerce?.products?.length || 0;
 
-        // FIX 2: Add Notification Count Check
         const prevNotifCount = prevState?.notifications?.length || 0;
         const newNotifCount = state?.notifications?.length || 0;
 
         const wooLoadingChanged = prevState?.woocommerce?.loading !== state?.woocommerce?.loading;
 
-        // Add the notification check to the condition
         if (prevShelvesCount !== newShelvesCount ||
             prevWooCount !== newWooCount ||
-            prevNotifCount !== newNotifCount || // <--- Added this check
+            prevNotifCount !== newNotifCount ||
             wooLoadingChanged) {
 
             if (router && typeof router.handleRoute === 'function') {
@@ -301,12 +299,10 @@ function updateSidebarSyncStatus(wooState) {
     const sidebarFooter = document.querySelector('.sidebar-footer');
     if (!sidebarFooter) return;
 
-    // Check if progress bar already exists
     let progressEl = document.getElementById('sidebar-woo-progress');
     const userInfo = sidebarFooter.querySelector('.user-info');
 
     if (wooState && wooState.loading) {
-        // Calculate percentage if total is known, otherwise indeterminate
         const {count, total} = wooState.progress || {count: 0, total: 0};
         const width = total > 0 ? (count / total) * 100 : 100;
         const isIndeterminate = !total || total === 0;
@@ -330,22 +326,18 @@ function updateSidebarSyncStatus(wooState) {
         `;
 
         if (!progressEl) {
-            // Create new element
             progressEl = document.createElement('div');
             progressEl.id = 'sidebar-woo-progress';
             progressEl.innerHTML = html;
-            // Insert strictly before user-info
             if (userInfo) {
                 sidebarFooter.insertBefore(progressEl, userInfo);
             } else {
                 sidebarFooter.appendChild(progressEl);
             }
         } else {
-            // Update existing
             progressEl.innerHTML = html;
         }
     } else {
-        // Remove if not loading
         if (progressEl) progressEl.remove();
     }
 }
@@ -371,7 +363,6 @@ async function loadAllData() {
         const shelves = buildShelves(locations);
         store.setShelves(shelves);
 
-        // Sync WooCommerce in background (non-blocking)
         const wooEnabled = store.getState().config?.woocommerce?.enabled;
         if (wooEnabled) {
             fetchWooProducts().catch(e => {

@@ -38,6 +38,7 @@ jobs:
           echo "EXPO_PUBLIC_GSHEET_ID=${{ secrets.EXPO_PUBLIC_GSHEET_ID }}" >> .env
           echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
           echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_CLIENT_ID }}" >> .env
           echo "DEBUG=false" >> .env
           echo "LOG_LEVEL=info" >> .env
         shell: bash

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     wooRequest: (params) => ipcRenderer.invoke('woo-request', params),
     loginGoogle: (clientId) => ipcRenderer.invoke('login-google', clientId),
+    setBadgeCount: (count) => ipcRenderer.invoke('set-badge-count', count),
     platform: process.platform,
 
     // Auto-updater methods

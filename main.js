@@ -116,13 +116,9 @@ async function createWindow() {
         mainWindow = null;
     });
 
-    // Setup context menu for right-click
     setupContextMenu();
-
-    // Initialize auto-updater after window is ready
     appUpdater = new AppUpdater(mainWindow);
 
-    // Check for updates on startup (after 3 seconds delay)
     setTimeout(() => {
         appUpdater.checkForUpdates();
     }, 3000);
@@ -134,7 +130,6 @@ function setupContextMenu() {
 
         const menuTemplate = [];
 
-        // Text selection options
         if (selectionText) {
             menuTemplate.push(
                 {
@@ -146,7 +141,6 @@ function setupContextMenu() {
             );
         }
 
-        // Editable field options
         if (isEditable) {
             if (selectionText) {
                 menuTemplate.push(
@@ -178,7 +172,6 @@ function setupContextMenu() {
             );
         }
 
-        // Link options
         if (linkURL) {
             menuTemplate.push(
                 {
@@ -198,7 +191,6 @@ function setupContextMenu() {
             );
         }
 
-        // Image options
         if (mediaType === 'image') {
             menuTemplate.push(
                 {
@@ -213,7 +205,6 @@ function setupContextMenu() {
             );
         }
 
-        // Developer tools (always available)
         menuTemplate.push(
             {
                 label: 'Inspect Element',
@@ -229,7 +220,6 @@ function setupContextMenu() {
             }
         );
 
-        // Only show menu if there are items
         if (menuTemplate.length > 0) {
             const contextMenu = Menu.buildFromTemplate(menuTemplate);
             contextMenu.popup({window: mainWindow});
@@ -275,18 +265,29 @@ ipcMain.handle('get-app-version', () => {
     return appPackage.version;
 });
 
-// For Google Login
+// Update badge count
+ipcMain.handle('set-badge-count', (event, count) => {
+    if (process.platform === 'darwin') {
+        app.dock.setBadge(count > 0 ? String(count) : '');
+    } else if (process.platform === 'win32') {
+        if (count > 0) {
+            mainWindow.setOverlayIcon(
+                path.join(__dirname, 'assets/icons/badge.png'),
+                `${count} unread notifications`
+            );
+        } else {
+            mainWindow.setOverlayIcon(null, '');
+        }
+    }
+    return { success: true };
+});
+
 ipcMain.handle('login-google', async (event, clientId) => {
     return new Promise((resolve, reject) => {
-        // 1. Start a local server to handle the callback
         authServer = http.createServer((req, res) => {
             const urlObj = new URL(req.url, `http://127.0.0.1:4200`);
 
-            // If we get the code/token in the URL (Implicit Flow usually puts it in hash,
-            // but to keep it simple and secure without secrets, we'll use a script to extract hash)
             if (urlObj.pathname === '/callback') {
-
-                // Serve a page that extracts the hash (#) parameters and POSTs them back
                 res.writeHead(200, {'Content-Type': 'text/html'});
                 res.end(`
     <html>
@@ -333,12 +334,10 @@ ipcMain.handle('login-google', async (event, clientId) => {
           <p style="font-size: 0.9em; margin-top: 10px; color: #999;">You can close this tab once the app updates.</p>
         </div>
         <script>
-          // Extract hash params (access_token, id_token)
           const hash = window.location.hash.substring(1);
           const params = new URLSearchParams(hash);
           
           if (params.has('id_token')) {
-            // Send back to server via POST
             fetch('/token', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -347,7 +346,6 @@ ipcMain.handle('login-google', async (event, clientId) => {
                 access_token: params.get('access_token')
               })
             }).then(() => {
-               // Optional: Update UI to say "Success" after the fetch completes
                document.querySelector('h1').textContent = "Success!";
                document.querySelector('p').textContent = "You can now return to the app.";
                document.querySelector('.spinner').style.display = 'none';
@@ -364,7 +362,6 @@ ipcMain.handle('login-google', async (event, clientId) => {
                 return;
             }
 
-            // Handle the POST from the script above
             if (req.method === 'POST' && req.url === '/token') {
                 let body = '';
                 req.on('data', chunk => body += chunk.toString());
@@ -373,13 +370,10 @@ ipcMain.handle('login-google', async (event, clientId) => {
                         const data = JSON.parse(body);
                         res.writeHead(200);
                         res.end('Authentication successful! You can close this window.');
-
-                        // Success! Return tokens to Electron
                         resolve(data);
                     } catch (e) {
                         reject(e);
                     } finally {
-                        // Cleanup: Close server
                         if (authServer) {
                             authServer.close();
                             authServer = null;
@@ -390,19 +384,13 @@ ipcMain.handle('login-google', async (event, clientId) => {
             }
         });
 
-        // Start listening on fixed port 4200 (Must match Google Console Redirect URI)
         authServer.listen(4200, '127.0.0.1', () => {
-            // 2. Open System Browser with Google OAuth URL
             const redirectUri = 'http://127.0.0.1:4200/callback';
             const scope = encodeURIComponent('email profile openid https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly');
-
-            // Using 'token' and 'id_token' response type (Implicit Flow) to avoid needing Client Secret in app
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token%20id_token&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&nonce=${Date.now()}`;
-
             shell.openExternal(authUrl);
         });
 
-        // Handle timeout or errors
         authServer.on('error', (err) => {
             if (authServer) authServer.close();
             reject(new Error('Failed to start auth server: ' + err.message));
@@ -422,7 +410,6 @@ ipcMain.handle('open-external', async (event, url) => {
 
 ipcMain.handle('check-for-updates', async () => {
     if (appUpdater) {
-        // Pass true to indicate this is a manual check
         appUpdater.checkForUpdates(true);
         return {success: true};
     }

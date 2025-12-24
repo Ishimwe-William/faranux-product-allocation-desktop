@@ -4,7 +4,6 @@
 
 import {store} from './store.js';
 
-// Initialize env vars (Fallback only)
 let GSHEETS_API_KEY = null;
 let GSHEET_ID = null;
 
@@ -25,22 +24,17 @@ const envPromise = (async () => {
 
 const GSHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
-// Helper: Get Auth Headers if Google Token exists
 function getAuthHeaders() {
     const state = store.getState();
     const token = state.auth?.googleAccessToken;
-
-    // If we have a Google Token, use Bearer Auth (works for restricted sheets)
     if (token) {
         return {
             'Authorization': `Bearer ${token}`
         };
     }
-    // If no token, return empty object (will rely on API Key in URL)
     return {};
 }
 
-// ... [Keep COLUMN_MAPPINGS, normalizeHeader, mapHeaders, getFieldValue as they were] ...
 const COLUMN_MAPPINGS = {
     product_name: ['product_name', 'item', 'name', 'product', 'item_name', 'product name', 'item name'],
     sku: ['sku', 'item_code', 'product_code', 'item code', 'product code', 'part_number', 'part number'],
@@ -97,10 +91,17 @@ function getFieldValue(row, headers, headerMap, standardField) {
     return row[headerIndex] ? String(row[headerIndex]).trim() : '';
 }
 
+// UPDATED: Prioritize Firebase config sheet ID over env
 function getCurrentSheetId() {
     if (store) {
         const state = store.getState();
-        return state.config?.sheetId || GSHEET_ID || null;
+        // Firebase config takes priority
+        const firebaseSheetId = state.config?.sheetId;
+        if (firebaseSheetId) {
+            return firebaseSheetId;
+        }
+        // Fallback to env only if no Firebase config
+        return GSHEET_ID || null;
     }
     return GSHEET_ID || null;
 }
@@ -129,7 +130,6 @@ async function getFileMimeType(fileId) {
     await envPromise;
     try {
         const url = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType&key=${GSHEETS_API_KEY}`;
-        // Add headers here too
         const response = await fetch(url, { headers: getAuthHeaders() });
         if (response.ok) {
             const data = await response.json();
@@ -145,11 +145,9 @@ async function fetchExcelFromDrive(fileId) {
     await envPromise;
     try {
         const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${GSHEETS_API_KEY}`;
-        // Add headers for Drive download
         let response = await fetch(driveUrl, { headers: getAuthHeaders() });
 
         if (!response.ok) {
-            // Fallback for public files (often don't need token, but it doesn't hurt usually)
             const publicUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
             response = await fetch(publicUrl);
         }
@@ -167,7 +165,6 @@ async function fetchExcelFromDrive(fileId) {
     }
 }
 
-// ... [Keep parseProductsFromExcel, parseLocationsFromExcel, parseLocationsFromProducts] ...
 function parseProductsFromExcel(workbook) {
     let sheetName = workbook.SheetNames.find(name => name.toLowerCase().includes('product')) || workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
@@ -221,8 +218,6 @@ function parseLocationsFromProducts(products) {
     return locations;
 }
 
-// Exported Functions Updated with Headers
-
 export async function testSheetConnection(sheetId = null) {
     await envPromise;
     try {
@@ -248,7 +243,6 @@ export async function testSheetConnection(sheetId = null) {
         }
 
         const url = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        // UPDATED: Use headers
         const response = await fetch(url, { headers: getAuthHeaders() });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || 'Failed to fetch sheet');
@@ -287,9 +281,7 @@ export async function fetchProducts(sheetId = null) {
             if (workbook) return parseProductsFromExcel(workbook);
         }
 
-        // Google Sheets Logic
         const metaUrl = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        // UPDATED
         const metaResponse = await fetch(metaUrl, { headers: getAuthHeaders() });
         const metaData = await metaResponse.json();
         if (!metaResponse.ok) throw new Error(metaData.error?.message || 'Failed to fetch sheet metadata');
@@ -299,7 +291,6 @@ export async function fetchProducts(sheetId = null) {
         const sheetName = productsSheet.properties?.title || 'Sheet1';
 
         const valuesUrl = `${GSHEETS_API_BASE}/${id}/values/${encodeURIComponent(sheetName)}?key=${GSHEETS_API_KEY}`;
-        // UPDATED
         const valuesResponse = await fetch(valuesUrl, { headers: getAuthHeaders() });
         const valuesData = await valuesResponse.json();
         const rows = valuesData.values || [];
@@ -334,15 +325,12 @@ export async function fetchLocations(sheetId = null) {
 
         if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') sourceType = 'excel_file';
 
-        // 1. Excel File Logic
         if (sourceType === 'excel_file') {
             const workbook = await fetchExcelFromDrive(fileId);
             if (workbook) return parseLocationsFromExcel(workbook);
         }
 
-        // 2. Google Sheets Logic
         const metaUrl = `${GSHEETS_API_BASE}/${id}?key=${GSHEETS_API_KEY}`;
-        // UPDATED
         const metaResponse = await fetch(metaUrl, { headers: getAuthHeaders() });
         const metaData = await metaResponse.json();
 
@@ -351,18 +339,15 @@ export async function fetchLocations(sheetId = null) {
         const sheets = metaData.sheets || [];
         const locationsSheet = sheets.find(s => s.properties?.title?.toLowerCase().includes('location'));
 
-        // 3. Fallback: If no Location tab, parse from Products
         if (!locationsSheet) {
             console.warn('[GoogleSheets] No "Location" tab found. Parsing locations from Products list...');
             const products = await fetchProducts(id);
             return parseLocationsFromProducts(products);
         }
 
-        // 4. Fetch the Location Tab
         const sheetName = locationsSheet.properties?.title;
 
         const valuesUrl = `${GSHEETS_API_BASE}/${id}/values/${encodeURIComponent(sheetName)}?key=${GSHEETS_API_KEY}`;
-        // UPDATED
         const valuesResponse = await fetch(valuesUrl, { headers: getAuthHeaders() });
         const valuesData = await valuesResponse.json();
         const rows = valuesData.values || [];
@@ -386,7 +371,6 @@ export async function fetchLocations(sheetId = null) {
     }
 }
 
-// ... [Keep buildShelves, searchProducts, findProductLocations as they were] ...
 export function buildShelves(locations) {
     const shelvesMap = new Map();
     locations.forEach(location => {

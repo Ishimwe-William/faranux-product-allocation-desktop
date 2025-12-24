@@ -58,6 +58,21 @@ export async function initializeFirebase() {
         auth = firebase.auth();
         db = firebase.firestore();
 
+        // Enable persistence for offline support and faster loads
+        try {
+            await db.enablePersistence({ synchronizeTabs: true });
+            console.log('[Firebase] Persistence enabled');
+        } catch (err) {
+            if (err.code === 'failed-precondition') {
+                console.warn('[Firebase] Persistence failed: Multiple tabs open');
+            } else if (err.code === 'unimplemented') {
+                console.warn('[Firebase] Persistence not available in this browser');
+            }
+        }
+
+        // Set persistence to LOCAL (survives browser restarts)
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
         googleProvider = new firebase.auth.GoogleAuthProvider();
         googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
         googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
@@ -73,13 +88,11 @@ export async function initializeFirebase() {
                     photoURL: user.photoURL
                 });
 
-                // Try to get a fresh token if user is logged in
                 const state = store.getState();
                 if (!state.auth.googleAccessToken) {
                     try {
                         const result = await auth.currentUser.getIdTokenResult();
                         if (result && result.signInProvider === 'google.com') {
-                            // User signed in with Google but token not in storage
                             console.log('[Auth] Google user detected, token may have expired');
                         }
                     } catch (e) {
@@ -127,40 +140,32 @@ export async function signInWithGoogle() {
     try {
         if (!auth) throw new Error('Firebase not initialized.');
 
-        // 1. Get Client ID from Environment
-        // You can also hardcode it here for testing if you haven't set up .env yet
         const env = await window.electronAPI.getEnv();
         const clientId = env.GOOGLE_CLIENT_ID;
 
-        if (!clientId) {
-            throw new Error('Google Client ID is missing in .env configuration');
+        if (!clientId || clientId.includes('YOUR_')) {
+            throw new Error('Google Client ID is missing in .env configuration.\n\nPlease add GOOGLE_CLIENT_ID to your .env file.');
         }
 
-        // 2. Trigger System Browser Login via Main Process
-        // This opens Chrome, user logs in, and Main process returns the tokens
         const tokens = await window.electronAPI.loginGoogle(clientId);
 
         if (!tokens || !tokens.id_token) {
             throw new Error('Failed to receive tokens from Google Login');
         }
 
-        // 3. Create Firebase Credential using the manual tokens
         const credential = firebase.auth.GoogleAuthProvider.credential(
             tokens.id_token,
             tokens.access_token
         );
 
-        // 4. Sign in to Firebase with that credential
         const result = await auth.signInWithCredential(credential);
-
-        // 5. Store token for Sheet access (same as before)
         store.setGoogleToken(tokens.access_token);
 
         return result.user;
 
     } catch (error) {
         console.error('Google Sign In Error:', error);
-        throw error; // This will be caught by auth.js and shown in the UI
+        throw error;
     }
 }
 
@@ -235,7 +240,6 @@ export async function updateSheetId(sheetId, userEmail) {
     }
 }
 
-// WooCommerce Configuration
 export async function updateWooConfig(wooConfig, userEmail) {
     try {
         const config = store.getState().config;
