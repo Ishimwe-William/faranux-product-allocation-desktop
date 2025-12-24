@@ -19,18 +19,10 @@ class NotificationService {
         this.db = db;
         this.userId = userId;
 
-        // Load notification sound
         this.audio = new Audio('assets/sounds/notification.mp3');
         this.audio.volume = 0.7;
 
-        // Request notification permission
         this.requestNotificationPermission();
-
-        // Load unread count from localStorage
-        const unreadCount = this.getUnreadCount();
-        store.setNotificationCount(unreadCount);
-
-        // Subscribe to real-time notifications
         this.subscribeToNotifications();
 
         this.isInitialized = true;
@@ -54,64 +46,56 @@ class NotificationService {
             this.unsubscribe();
         }
 
-        // Listen to notifications collection for this user
+        // REMOVED .limit(100) to fetch ALL notifications
         this.unsubscribe = this.db
             .collection('notifications')
             .where('userId', 'in', [this.userId, 'all_admins'])
             .orderBy('timestamp', 'desc')
-            .limit(50)
             .onSnapshot(
                 (snapshot) => {
-                    let hasNewItems = false;
+                    const allNotifications = [];
+                    let unreadCount = 0;
 
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === 'added') {
-                            const notification = {
-                                id: change.doc.id,
-                                ...change.doc.data()
-                            };
+                    snapshot.docs.forEach((doc) => {
+                        const data = doc.data();
 
-                            // FIX 1: Increased window from 10s (10000) to 60s (60000)
-                            // This accounts for network latency and clock skew
+                        if (data.deletedBy && data.deletedBy.includes(this.userId)) {
+                            return;
+                        }
+
+                        const notification = {
+                            id: doc.id,
+                            ...data
+                        };
+
+                        const isRead = data.readBy && data.readBy.includes(this.userId);
+                        if (!isRead) {
+                            unreadCount++;
+                        }
+
+                        allNotifications.push(notification);
+
+                        if (doc.metadata.hasPendingWrites === false) {
                             const now = Date.now();
-                            // Handle both Firestore Timestamp objects and standard dates
                             const notifTime = notification.timestamp?.toMillis ? notification.timestamp.toMillis() : new Date(notification.timestamp).getTime();
-
-                            if (now - notifTime < 60000) {
+                            if (now - notifTime < 60000 && !isRead) {
                                 this.handleNewNotification(notification);
                             }
-                            hasNewItems = true;
                         }
                     });
 
-                    // Always update store if we have data
-                    const allNotifications = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
                     store.setNotifications(allNotifications);
+                    store.setNotificationCount(unreadCount);
                 },
                 (error) => {
                     console.error('[Notifications] Subscription error:', error);
-                    // CRITICAL: If you see "The query requires an index" in console,
-                    // you MUST click the link provided in the error message!
                 }
             );
     }
 
     handleNewNotification(notification) {
-        console.log('[Notifications] New notification:', notification);
-
-        // Play sound
         this.playNotificationSound();
-
-        // Show native OS notification
         this.showNativeNotification(notification);
-
-        // Mark as unread and increment counter
-        this.markAsUnread(notification.id);
-
-        // Show in-app notification banner
         this.showInAppBanner(notification);
     }
 
@@ -134,19 +118,15 @@ class NotificationService {
             const nativeNotif = new Notification(title, {
                 body: body,
                 icon: 'assets/icons/icon.png',
-                badge: 'assets/icons/badge.png',
                 tag: notification.id,
-                requireInteraction: false
+                requireInteraction: false,
+                badge: 'assets/icons/icon.png' // App badge icon
             });
 
             nativeNotif.onclick = () => {
                 window.focus();
                 this.markAsRead(notification.id);
-                this.navigateToNotification(notification);
             };
-
-            // Auto close after 5 seconds
-            setTimeout(() => nativeNotif.close(), 5000);
         }
     }
 
@@ -170,154 +150,127 @@ class NotificationService {
 
         document.body.appendChild(banner);
 
-        // Auto remove after 5 seconds
         setTimeout(() => {
             banner.classList.add('notification-banner-exit');
             setTimeout(() => banner.remove(), 300);
         }, 5000);
 
-        // Close button
         banner.querySelector('.notification-banner-close').onclick = () => {
             banner.classList.add('notification-banner-exit');
             setTimeout(() => banner.remove(), 300);
         };
 
-        // Click to navigate
         banner.onclick = (e) => {
             if (!e.target.closest('.notification-banner-close')) {
                 this.markAsRead(notification.id);
-                this.navigateToNotification(notification);
                 banner.remove();
             }
         };
     }
 
+    async markAsRead(notificationId) {
+        try {
+            await this.db.collection('notifications').doc(notificationId).update({
+                readBy: firebase.firestore.FieldValue.arrayUnion(this.userId)
+            });
+        } catch (error) {
+            console.error('[Notifications] Mark read error:', error);
+        }
+    }
+
+    async markAsUnread(notificationId) {
+        try {
+            await this.db.collection('notifications').doc(notificationId).update({
+                readBy: firebase.firestore.FieldValue.arrayRemove(this.userId)
+            });
+        } catch (error) {
+            console.error('[Notifications] Mark unread error:', error);
+        }
+    }
+
+    async markAllAsRead() {
+        const state = store.getState();
+        const notifications = state.notifications || [];
+
+        const batch = this.db.batch();
+        let count = 0;
+
+        notifications.forEach(notif => {
+            if (!notif.readBy || !notif.readBy.includes(this.userId)) {
+                const ref = this.db.collection('notifications').doc(notif.id);
+                batch.update(ref, {
+                    readBy: firebase.firestore.FieldValue.arrayUnion(this.userId)
+                });
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            await batch.commit();
+        }
+    }
+
+    async deleteNotification(notificationId) {
+        try {
+            await this.db.collection('notifications').doc(notificationId).update({
+                deletedBy: firebase.firestore.FieldValue.arrayUnion(this.userId)
+            });
+        } catch (error) {
+            console.error('[Notifications] Delete error:', error);
+        }
+    }
+
+    getUnreadIds() {
+        const state = store.getState();
+        const notifications = state.notifications || [];
+        return notifications
+            .filter(n => !n.readBy || !n.readBy.includes(this.userId))
+            .map(n => n.id);
+    }
+
     getNotificationTitle(notification) {
         switch(notification.type) {
-            case 'order_created':
-                return '🛒 New Order Received';
-            case 'order_cancelled':
-                return '❌ Order Cancelled';
-            case 'order_completed':
-                return '✅ Order Completed';
-            case 'order_processing':
-                return '⏳ Order Processing';
-            case 'order_failed':
-                return '⚠️ Order Failed';
-            case 'low_stock':
-                return '📦 Low Stock Alert';
-            default:
-                return 'Notification';
+            case 'order_created': return '🛒 New Order Received';
+            case 'order_cancelled': return '❌ Order Cancelled';
+            case 'order_completed': return '✅ Order Completed';
+            case 'order_processing': return '⏳ Order Processing';
+            case 'order_failed': return '⚠️ Order Failed';
+            case 'low_stock': return '📦 Low Stock Alert';
+            default: return 'Notification';
         }
     }
 
     getNotificationBody(notification) {
         const data = notification.data || {};
-
         switch(notification.type) {
-            case 'order_created':
-                return `Order #${data.orderId} - ${data.total || 'Amount unknown'}\nCustomer: ${data.customerName || 'N/A'}`;
-            case 'order_cancelled':
-                return `Order #${data.orderId} - ${data.total || ''}`;
-            case 'order_completed':
-                return `Order #${data.orderId} is complete`;
-            case 'order_processing':
-                return `Order #${data.orderId} is being processed`;
-            case 'order_failed':
-                return `Order #${data.orderId} has failed`;
-            case 'low_stock':
-                return `${data.productName} - Only ${data.quantity} left`;
-            default:
-                return notification.message || 'You have a new notification';
+            case 'order_created': return `Order #${data.orderId} - ${data.total || ''}\nCustomer: ${data.customerName || 'N/A'}`;
+            case 'order_cancelled': return `Order #${data.orderId} - ${data.total || ''}`;
+            case 'order_completed': return `Order #${data.orderId} is complete`;
+            case 'order_processing': return `Order #${data.orderId} is being processed`;
+            case 'low_stock': return `${data.productName} - Only ${data.quantity} left`;
+            default: return notification.message || 'You have a new notification';
         }
     }
 
     getNotificationIcon(notification) {
         switch(notification.type) {
-            case 'order_created':
-                return 'shopping_cart';
-            case 'order_cancelled':
-                return 'cancel';
-            case 'order_completed':
-                return 'check_circle';
-            case 'order_processing':
-                return 'pending';
-            case 'order_failed':
-                return 'error';
-            case 'low_stock':
-                return 'inventory_2';
-            default:
-                return 'notifications';
+            case 'order_created': return 'shopping_cart';
+            case 'order_cancelled': return 'cancel';
+            case 'order_completed': return 'check_circle';
+            case 'order_processing': return 'pending';
+            case 'low_stock': return 'inventory_2';
+            default: return 'notifications';
         }
     }
 
     getNotificationColor(type) {
         switch(type) {
-            case 'order_created':
-                return '#4caf50';
-            case 'order_cancelled':
-                return '#f44336';
-            case 'order_completed':
-                return '#2196f3';
-            case 'order_processing':
-                return '#ff9800';
-            case 'order_failed':
-                return '#f44336';
-            case 'low_stock':
-                return '#ff9800';
-            default:
-                return '#9e9e9e';
-        }
-    }
-
-    navigateToNotification(notification) {
-        // Navigate based on notification type
-        if (notification.type.includes('order')) {
-            console.log('[Notifications] Navigate to order:', notification.data?.orderId);
-            // You can add navigation logic here if you have an orders view
-        }
-    }
-
-    markAsRead(notificationId) {
-        const unreadIds = this.getUnreadIds();
-        const newUnreadIds = unreadIds.filter(id => id !== notificationId);
-        localStorage.setItem(`unread_notifications_${this.userId}`, JSON.stringify(newUnreadIds));
-        store.setNotificationCount(newUnreadIds.length);
-    }
-
-    markAsUnread(notificationId) {
-        const unreadIds = this.getUnreadIds();
-        if (!unreadIds.includes(notificationId)) {
-            unreadIds.push(notificationId);
-            localStorage.setItem(`unread_notifications_${this.userId}`, JSON.stringify(unreadIds));
-            store.setNotificationCount(unreadIds.length);
-        }
-    }
-
-    markAllAsRead() {
-        localStorage.setItem(`unread_notifications_${this.userId}`, JSON.stringify([]));
-        store.setNotificationCount(0);
-    }
-
-    getUnreadIds() {
-        const stored = localStorage.getItem(`unread_notifications_${this.userId}`);
-        return stored ? JSON.parse(stored) : [];
-    }
-
-    getUnreadCount() {
-        return this.getUnreadIds().length;
-    }
-
-    isUnread(notificationId) {
-        return this.getUnreadIds().includes(notificationId);
-    }
-
-    async deleteNotification(notificationId) {
-        try {
-            await this.db.collection('notifications').doc(notificationId).delete();
-            this.markAsRead(notificationId);
-        } catch (error) {
-            console.error('[Notifications] Delete error:', error);
+            case 'order_created': return '#4caf50';
+            case 'order_cancelled': return '#f44336';
+            case 'order_completed': return '#2196f3';
+            case 'order_processing': return '#ff9800';
+            case 'low_stock': return '#ff9800';
+            default: return '#9e9e9e';
         }
     }
 

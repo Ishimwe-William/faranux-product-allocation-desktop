@@ -7,6 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const AppUpdater = require('./updater');
 const appPackage = require('./package.json');
+const { nativeImage } = require('electron');
 
 require('dotenv').config();
 
@@ -16,6 +17,8 @@ let appUpdater;
 let authServer;
 
 require('dotenv').config({path: path.join(__dirname, '.env')});
+
+app.setName('Inventory Manager');
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -27,6 +30,26 @@ const MIME_TYPES = {
     '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon'
 };
+
+function createBadgeIcon(count) {
+    // Create a simple SVG badge
+    const size = 32;
+    const text = count > 99 ? '99+' : String(count);
+    const fontSize = text.length > 2 ? 12 : 16;
+
+    const svg = `
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="#ef4444"/>
+      <text x="${size/2}" y="${size/2}" 
+            font-family="Arial" font-size="${fontSize}" font-weight="bold"
+            text-anchor="middle" dominant-baseline="central" fill="white">
+        ${text}
+      </text>
+    </svg>
+    `;
+
+    return nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+}
 
 function createLocalServer() {
     return new Promise((resolve) => {
@@ -65,6 +88,11 @@ function createLocalServer() {
 
 async function createWindow() {
     const port = await createLocalServer();
+
+    // Add this for Windows notifications
+    if (process.platform === 'win32') {
+        app.setAppUserModelId('com.bunsenplus.fxproductallocation');
+    }
 
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -266,19 +294,23 @@ ipcMain.handle('get-app-version', () => {
     return appPackage.version;
 });
 
-// Update badge count
+// Update the set-badge-count handler:
 ipcMain.handle('set-badge-count', (event, count) => {
     if (process.platform === 'darwin') {
         app.dock.setBadge(count > 0 ? String(count) : '');
     } else if (process.platform === 'win32') {
         if (count > 0) {
+            const badgeIcon = createBadgeIcon(count);
             mainWindow.setOverlayIcon(
-                path.join(__dirname, 'assets/icons/badge.png'),
-                `${count} unread notifications`
+                badgeIcon,
+                `${count} unread notification${count !== 1 ? 's' : ''}`
             );
         } else {
             mainWindow.setOverlayIcon(null, '');
         }
+    } else if (process.platform === 'linux') {
+        // Linux Unity launcher badge
+        app.setBadgeCount(count);
     }
     return { success: true };
 });
