@@ -1,25 +1,32 @@
-/* ==================================
-   main.js - Electron Main Process
-   ================================== */
-const {app, BrowserWindow, ipcMain, shell, Menu} = require('electron');
+/* ==========================================================================
+   main.js - Electron Main Process Entry Point
+   ==========================================================================
+   This file controls the application lifecycle, creates the native browser
+   window, manages the auto-updater, and handles all communication between
+   the OS and the web interface (Renderer process) via IPC.
+   ========================================================================== */
+
+const { app, BrowserWindow, ipcMain, shell, Menu, nativeImage } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
-const AppUpdater = require('./updater');
+const AppUpdater = require('./updater'); // Custom updater logic
 const appPackage = require('./package.json');
-const { nativeImage } = require('electron');
 
+// Initialize environment variables
 require('dotenv').config();
+// Ensure .env is loaded specifically from the current directory (helpful for production builds)
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-let mainWindow;
-let server;
-let appUpdater;
-let authServer;
+let mainWindow;  // Reference to the main application window
+let server;      // Reference to the local static file server
+let appUpdater;  // Reference to the auto-updater instance
+let authServer;  // Temporary server for handling Google OAuth callbacks
 
-require('dotenv').config({path: path.join(__dirname, '.env')});
-
+// Set the internal application name (used for User Data directories)
 app.setName('Inventory Manager');
 
+// MIME types for the local static server to serve files correctly
 const MIME_TYPES = {
     '.html': 'text/html',
     '.js': 'text/javascript',
@@ -31,29 +38,100 @@ const MIME_TYPES = {
     '.ico': 'image/x-icon'
 };
 
-function createBadgeIcon(count) {
-    // Create a simple SVG badge
-    const size = 32;
-    const text = count > 99 ? '99+' : String(count);
-    const fontSize = text.length > 2 ? 12 : 16;
+/**
+ * Creates a dynamic "Badge" icon for Windows Taskbar.
+ * MacOS handles badges natively, but Windows requires an "Overlay Icon".
+ * This function draws a red circle with a white number using the Canvas API.
+ * * @param {number} count - The number of unread notifications
+ * @returns {Promise<nativeImage>} - Electron NativeImage object
+ */
+async function createBadgeIcon(count) {
+    try {
+        const { createCanvas } = require('canvas');
 
-    const svg = `
-    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="#ef4444"/>
-      <text x="${size/2}" y="${size/2}" 
-            font-family="Arial" font-size="${fontSize}" font-weight="bold"
-            text-anchor="middle" dominant-baseline="central" fill="white">
-        ${text}
-      </text>
-    </svg>
-    `;
+        // 1. Setup Canvas
+        // 128x128 provides high enough resolution for Windows taskbar scaling
+        const size = 128;
+        const canvas = createCanvas(size, size);
+        const ctx = canvas.getContext('2d');
 
-    return nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+        // 2. Clear Canvas (Ensure transparency)
+        ctx.clearRect(0, 0, size, size);
+
+        // 3. Define Dimensions & Alignment
+        // Slightly offset to ensure the shadow doesn't get clipped
+        const centerX = (size / 2) + 5;
+        const centerY = (size / 2) + 5;
+        const radius = (size / 2) - 5;
+
+        // 4. Add Drop Shadow
+        // A black shadow ensures the red badge is visible on light taskbars
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 3;
+
+        // 5. Draw The Circle Badge (Background)
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff0000'; // Bright Notification Red
+        ctx.fill();
+
+        // Reset shadow so the text inside remains crisp
+        ctx.shadowColor = 'transparent';
+
+        // 6. Draw Text (The Counter)
+        const text = count > 99 ? '99+' : String(count);
+
+        // Dynamic Font Sizing:
+        // Adjust font size based on how many digits are displayed to fit the circle
+        let fontSize;
+        let yOffset;
+
+        if (text.length === 1) {
+            fontSize = 95;
+            yOffset = 4;
+        } else if (text.length === 2) {
+            fontSize = 75;
+            yOffset = 4;
+        } else {
+            fontSize = 55; // Smaller font for "99+"
+            yOffset = 2;
+        }
+
+        ctx.fillStyle = '#ffffff'; // White text
+        ctx.font = `bold ${fontSize}px "Segoe UI", "Arial", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.fillText(text, centerX, centerY + yOffset);
+
+        // Convert canvas buffer to Electron NativeImage
+        const buffer = canvas.toBuffer('image/png');
+        const image = nativeImage.createFromBuffer(buffer);
+
+        if (image.isEmpty()) {
+            console.error('[Main] Created badge image is empty');
+            return null;
+        }
+
+        return image;
+
+    } catch (e) {
+        console.error('[Main] Exception creating badge:', e);
+        return null;
+    }
 }
 
+/**
+ * Starts a local HTTP server to serve the React/HTML renderer files.
+ * This avoids "file://" protocol restrictions (CORS, loading local resources).
+ * * @returns {Promise<number>} - The port number the server is listening on.
+ */
 function createLocalServer() {
     return new Promise((resolve) => {
         server = http.createServer((req, res) => {
+            // Default to index.html for root, otherwise serve specific file
             let fileUrl = req.url === '/' ? 'index.html' : req.url;
             let filePath = path.join(__dirname, 'renderer', fileUrl);
 
@@ -63,21 +141,25 @@ function createLocalServer() {
             fs.readFile(filePath, (error, content) => {
                 if (error) {
                     if (error.code === 'ENOENT') {
+                        // File not found
                         console.warn(`[Server] 404 Not Found: ${filePath}`);
                         res.writeHead(404);
                         res.end('404 Not Found');
                     } else {
+                        // Server error
                         console.error(`[Server] 500 Error: ${error.code} for ${filePath}`);
                         res.writeHead(500);
                         res.end('500 Internal Server Error');
                     }
                 } else {
-                    res.writeHead(200, {'Content-Type': contentType});
+                    // Success: Serve file with correct MIME type
+                    res.writeHead(200, { 'Content-Type': contentType });
                     res.end(content, 'utf-8');
                 }
             });
         });
 
+        // Listen on port 0 (OS assigns a random available free port)
         server.listen(0, '127.0.0.1', () => {
             const port = server.address().port;
             console.log(`[Main] Local server running on port ${port}`);
@@ -86,14 +168,21 @@ function createLocalServer() {
     });
 }
 
+/**
+ * Initializes and creates the Main Electron Window.
+ */
 async function createWindow() {
+    // Wait for local server to start
     const port = await createLocalServer();
 
-    // Add this for Windows notifications
+    // NOTE: App User Model ID is required for Windows Toast Notifications
+    /*
     if (process.platform === 'win32') {
         app.setAppUserModelId('com.bunsenplus.fxproductallocation');
     }
+    */
 
+    // Create the browser window
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -101,176 +190,143 @@ async function createWindow() {
         minHeight: 600,
         icon: path.join(__dirname, 'assets/icons/icon.png'),
         webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            nodeIntegration: false, // SECURITY: Disable Node in renderer
+            contextIsolation: true, // SECURITY: Protect global scope
+            preload: path.join(__dirname, 'preload.js') // Bridge script
         },
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#1a1a1a', // Dark mode background to prevent white flash on load
         titleBarStyle: 'default',
         frame: true
     });
 
+    // Load the app from the local server
     await mainWindow.loadURL(`http://127.0.0.1:${port}`);
 
+    // --- SECURITY HANDLERS ---
+
+    // 1. Prevent in-app navigation to external sites
     mainWindow.webContents.on('will-navigate', (event, url) => {
         const isLocal = url.startsWith(`http://127.0.0.1:${port}`);
+        // If it's not our local server, open in default system browser
         if (!isLocal && (url.startsWith('http://') || url.startsWith('https://'))) {
             event.preventDefault();
             shell.openExternal(url);
         }
     });
 
-    mainWindow.webContents.setWindowOpenHandler(({url}) => {
+    // 2. Handle window.open() requests
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        // Allow Google Auth & Firebase popups
         if (url.startsWith('https://accounts.google.com') || url.includes('firebaseapp.com') || url.includes('auth')) {
-            return {action: 'allow'};
+            return { action: 'allow' };
         }
-
+        // Deny everything else and open in system browser
         if (url.startsWith('http://') || url.startsWith('https://')) {
             shell.openExternal(url);
-            return {action: 'deny'};
+            return { action: 'deny' };
         }
-        return {action: 'allow'};
+        return { action: 'allow' };
     });
 
-    mainWindow.webContents.on('did-finish-load', () => {
-        console.log('[Main] Page loaded successfully');
-    });
-
-    mainWindow.webContents.on('crashed', () => {
-        console.error('[Main] Renderer process crashed');
-    });
-
+    // Cleanup when window closes
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
 
+    // Initialize context menu (Right-click) and Updater
     setupContextMenu();
     appUpdater = new AppUpdater(mainWindow);
 
+    // Check for updates shortly after launch
     setTimeout(() => {
         appUpdater.checkForUpdates();
     }, 3000);
 }
 
+/**
+ * Adds a standard Right-Click Context Menu.
+ * Electron does not have a default context menu (Cut/Copy/Paste), so we must build it.
+ */
 function setupContextMenu() {
     mainWindow.webContents.on('context-menu', (event, params) => {
-        const {selectionText, isEditable, linkURL, mediaType} = params;
-
+        const { selectionText, isEditable, linkURL, mediaType } = params;
         const menuTemplate = [];
 
+        // Add 'Copy' if text is selected
         if (selectionText) {
             menuTemplate.push(
-                {
-                    label: 'Copy',
-                    role: 'copy',
-                    accelerator: 'CmdOrCtrl+C'
-                },
-                {type: 'separator'}
+                { label: 'Copy', role: 'copy', accelerator: 'CmdOrCtrl+C' },
+                { type: 'separator' }
             );
         }
 
+        // Add Editing inputs (Cut/Paste) for text boxes
         if (isEditable) {
             if (selectionText) {
                 menuTemplate.push(
-                    {
-                        label: 'Cut',
-                        role: 'cut',
-                        accelerator: 'CmdOrCtrl+X'
-                    },
-                    {
-                        label: 'Copy',
-                        role: 'copy',
-                        accelerator: 'CmdOrCtrl+C'
-                    }
+                    { label: 'Cut', role: 'cut', accelerator: 'CmdOrCtrl+X' },
+                    { label: 'Copy', role: 'copy', accelerator: 'CmdOrCtrl+C' }
                 );
             }
-
             menuTemplate.push(
-                {
-                    label: 'Paste',
-                    role: 'paste',
-                    accelerator: 'CmdOrCtrl+V'
-                },
-                {type: 'separator'},
-                {
-                    label: 'Select All',
-                    role: 'selectAll',
-                    accelerator: 'CmdOrCtrl+A'
-                }
+                { label: 'Paste', role: 'paste', accelerator: 'CmdOrCtrl+V' },
+                { type: 'separator' },
+                { label: 'Select All', role: 'selectAll', accelerator: 'CmdOrCtrl+A' }
             );
         }
 
+        // Add Link options
         if (linkURL) {
             menuTemplate.push(
-                {
-                    label: 'Open Link',
-                    click: () => {
-                        shell.openExternal(linkURL);
-                    }
-                },
-                {
-                    label: 'Copy Link Address',
-                    click: () => {
-                        const {clipboard} = require('electron');
-                        clipboard.writeText(linkURL);
-                    }
-                },
-                {type: 'separator'}
+                { label: 'Open Link', click: () => shell.openExternal(linkURL) },
+                { label: 'Copy Link Address', click: () => { require('electron').clipboard.writeText(linkURL); } },
+                { type: 'separator' }
             );
         }
 
+        // Add Image options
         if (mediaType === 'image') {
             menuTemplate.push(
-                {
-                    label: 'Copy Image',
-                    role: 'copyImageAt'
-                },
-                {
-                    label: 'Save Image As...',
-                    role: 'downloadURL'
-                },
-                {type: 'separator'}
+                { label: 'Copy Image', role: 'copyImageAt' },
+                { label: 'Save Image As...', role: 'downloadURL' },
+                { type: 'separator' }
             );
         }
 
+        // Always available developer tools
         menuTemplate.push(
-            {
-                label: 'Inspect Element',
-                click: () => {
-                    mainWindow.webContents.inspectElement(params.x, params.y);
-                },
-                accelerator: 'CmdOrCtrl+Shift+I'
-            },
-            {
-                label: 'Reload',
-                role: 'reload',
-                accelerator: 'CmdOrCtrl+R'
-            }
+            { label: 'Inspect Element', click: () => mainWindow.webContents.inspectElement(params.x, params.y), accelerator: 'CmdOrCtrl+Shift+I' },
+            { label: 'Reload', role: 'reload', accelerator: 'CmdOrCtrl+R' }
         );
 
         if (menuTemplate.length > 0) {
-            const contextMenu = Menu.buildFromTemplate(menuTemplate);
-            contextMenu.popup({window: mainWindow});
+            Menu.buildFromTemplate(menuTemplate).popup({ window: mainWindow });
         }
     });
 }
 
+// --- APP LIFECYCLE EVENTS ---
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
+    // Mac behavior: keep app in dock until Cmd+Q
+    if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
+    // Mac behavior: Re-create window if dock icon is clicked
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
+/* ==========================================================================
+   IPC HANDLERS (Communication between Renderer and Main)
+   ========================================================================== */
 
-// IPC Handlers
+/**
+ * Returns environment variables to the renderer.
+ * Using IPC is safer than exposing process.env directly in preload.
+ */
 ipcMain.handle('get-env', () => {
     return {
         FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -290,111 +346,75 @@ ipcMain.handle('get-env', () => {
     };
 });
 
-ipcMain.handle('get-app-version', () => {
-    return appPackage.version;
-});
+ipcMain.handle('get-app-version', () => appPackage.version);
 
-// Update the set-badge-count handler:
-ipcMain.handle('set-badge-count', (event, count) => {
-    if (process.platform === 'darwin') {
-        app.dock.setBadge(count > 0 ? String(count) : '');
-    } else if (process.platform === 'win32') {
-        if (count > 0) {
-            const badgeIcon = createBadgeIcon(count);
-            mainWindow.setOverlayIcon(
-                badgeIcon,
-                `${count} unread notification${count !== 1 ? 's' : ''}`
-            );
-        } else {
-            mainWindow.setOverlayIcon(null, '');
-        }
-    } else if (process.platform === 'linux') {
-        // Linux Unity launcher badge
-        app.setBadgeCount(count);
+/**
+ * Handles setting the unread count badge.
+ * Logic differs by Operating System.
+ */
+ipcMain.handle('set-badge-count', async (event, count) => {
+    if (!mainWindow) {
+        console.warn('[Main] No window available for badge update');
+        return { success: false, error: 'No window' };
     }
-    return { success: true };
+
+    try {
+        if (process.platform === 'darwin') {
+            // macOS: Native dock badge support
+            app.dock.setBadge(count > 0 ? String(count) : '');
+            return { success: true };
+
+        } else if (process.platform === 'win32') {
+            // Windows: Needs a generated Overlay Icon
+            if (count > 0) {
+                const badgeIcon = await createBadgeIcon(count);
+
+                if (badgeIcon && !badgeIcon.isEmpty()) {
+                    const description = `${count} unread notification${count !== 1 ? 's' : ''}`;
+                    mainWindow.setOverlayIcon(badgeIcon, description);
+                } else {
+                    console.warn('[Main] Badge icon creation returned null or empty image');
+                    return { success: false, error: 'Failed to create badge icon' };
+                }
+            } else {
+                // Clear the overlay
+                mainWindow.setOverlayIcon(null, '');
+            }
+            return { success: true };
+
+        } else if (process.platform === 'linux') {
+            // Linux: Basic badge count support
+            app.setBadgeCount(count);
+            return { success: true };
+        }
+
+        return { success: true };
+
+    } catch (error) {
+        console.error('[Main] Error setting badge:', error);
+        return { success: false, error: error.message };
+    }
 });
 
+/**
+ * Handles Google OAuth Login loopback.
+ * Creates a temporary local server to catch the Google redirect callback.
+ */
 ipcMain.handle('login-google', async (event, clientId) => {
     return new Promise((resolve, reject) => {
+        // Spin up temporary auth server
         authServer = http.createServer((req, res) => {
             const urlObj = new URL(req.url, `http://127.0.0.1:4200`);
 
+            // Step 2: Google redirects here with token in hash
             if (urlObj.pathname === '/callback') {
-                res.writeHead(200, {'Content-Type': 'text/html'});
-                res.end(`
-    <html>
-      <head>
-        <title>Authenticating...</title>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f5f5f5;
-            text-align: center;
-          }
-          .card {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 400px;
-          }
-          h1 { color: #333; margin-bottom: 16px; font-size: 24px; }
-          p { color: #666; margin-bottom: 0; line-height: 1.5; }
-          .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px auto;
-          }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="spinner"></div>
-          <h1>We're authenticating...</h1>
-          <p>Please check your app for successful login.</p>
-          <p style="font-size: 0.9em; margin-top: 10px; color: #999;">You can close this tab once the app updates.</p>
-        </div>
-        <script>
-          const hash = window.location.hash.substring(1);
-          const params = new URLSearchParams(hash);
-          
-          if (params.has('id_token')) {
-            fetch('/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id_token: params.get('id_token'),
-                access_token: params.get('access_token')
-              })
-            }).then(() => {
-               document.querySelector('h1').textContent = "Success!";
-               document.querySelector('p').textContent = "You can now return to the app.";
-               document.querySelector('.spinner').style.display = 'none';
-            });
-          } else {
-            document.querySelector('h1').textContent = "Authentication Failed";
-            document.querySelector('p').textContent = "No token found. Please try again.";
-            document.querySelector('.spinner').style.display = 'none';
-          }
-        </script>
-      </body>
-    </html>
-  `);
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                // Return HTML that extracts hash params and POSTs them to /token
+                res.end(`<html><body><h1>Success</h1><p>You can return to the app.</p><script>const hash=window.location.hash.substring(1);const params=new URLSearchParams(hash);if(params.has('id_token')){fetch('/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id_token:params.get('id_token'),access_token:params.get('access_token')})})}</script></body></html>`);
                 return;
             }
 
+            // Step 3: Receive token from the client-side script above
             if (req.method === 'POST' && req.url === '/token') {
                 let body = '';
                 req.on('data', chunk => body += chunk.toString());
@@ -402,31 +422,29 @@ ipcMain.handle('login-google', async (event, clientId) => {
                     try {
                         const data = JSON.parse(body);
                         res.writeHead(200);
-                        res.end('Authentication successful! You can close this window.');
-                        resolve(data);
-                    } catch (e) {
-                        reject(e);
-                    } finally {
-                        if (authServer) {
-                            authServer.close();
-                            authServer = null;
-                        }
+                        res.end('Auth successful');
+                        resolve(data); // Pass token back to Main -> Renderer
+                    } catch (e) { reject(e); }
+                    finally {
+                        // Close server after successful auth
+                        if (authServer) authServer.close();
+                        authServer = null;
                     }
                 });
                 return;
             }
         });
 
+        // Step 1: Start listener and open external browser for Google Login
         authServer.listen(4200, '127.0.0.1', () => {
             const redirectUri = 'http://127.0.0.1:4200/callback';
             const scope = encodeURIComponent('email profile openid https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly');
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token%20id_token&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&nonce=${Date.now()}`;
-            shell.openExternal(authUrl);
+            shell.openExternal(`https://accounts.google.com/o/oauth2/v2/auth?response_type=token%20id_token&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&nonce=${Date.now()}`);
         });
 
         authServer.on('error', (err) => {
             if (authServer) authServer.close();
-            reject(new Error('Failed to start auth server: ' + err.message));
+            reject(new Error('Auth server failed: ' + err.message));
         });
     });
 });
@@ -434,54 +452,48 @@ ipcMain.handle('login-google', async (event, clientId) => {
 ipcMain.handle('open-external', async (event, url) => {
     try {
         await shell.openExternal(url);
-        return {success: true};
+        return { success: true };
     } catch (error) {
-        console.error('Error opening external URL:', error);
-        return {success: false, error: error.message};
+        return { success: false, error: error.message };
     }
 });
 
 ipcMain.handle('check-for-updates', async () => {
     if (appUpdater) {
-        appUpdater.checkForUpdates(true);
-        return {success: true};
+        appUpdater.checkForUpdates(true); // 'true' forces a check
+        return { success: true };
     }
-    return {success: false, error: 'Updater not initialized'};
+    return { success: false, error: 'Updater not initialized' };
 });
 
-ipcMain.handle('woo-request', async (event, {siteUrl, consumerKey, consumerSecret, endpoint, method = 'GET'}) => {
+/**
+ * Proxies requests to WooCommerce API.
+ * This is done in the Main process to:
+ * 1. Bypass CORS issues in the Renderer.
+ * 2. Keep Basic Auth headers generation internal.
+ */
+ipcMain.handle('woo-request', async (event, { siteUrl, consumerKey, consumerSecret, endpoint, method = 'GET' }) => {
     return new Promise((resolve) => {
-        if (!siteUrl || !consumerKey || !consumerSecret) {
-            return resolve({success: false, error: 'Missing WooCommerce configuration'});
-        }
+        if (!siteUrl || !consumerKey || !consumerSecret) return resolve({ success: false, error: 'Missing config' });
 
         const baseUrl = siteUrl.replace(/\/$/, '');
         const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-        const fullUrl = `${baseUrl}/wp-json/wc/v3${cleanEndpoint}`;
-
+        // Create Basic Auth header
         const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
 
-        const options = {
-            method: method,
+        fetch(`${baseUrl}/wp-json/wc/v3${cleanEndpoint}`, {
+            method,
             headers: {
                 'Authorization': `Basic ${auth}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'Electron-Inventory-App'
             }
-        };
-
-        fetch(fullUrl, options)
-            .then(async response => {
-                if (!response.ok) {
-                    const text = await response.text();
-                    throw new Error(`WooCommerce Error ${response.status}: ${text}`);
-                }
-                return response.json();
+        })
+            .then(async res => {
+                if (!res.ok) throw new Error(`Woo Error ${res.status}: ${await res.text()}`);
+                return res.json();
             })
-            .then(data => resolve({success: true, data}))
-            .catch(error => {
-                console.error('Woo Request Failed:', error);
-                resolve({success: false, error: error.message});
-            });
+            .then(data => resolve({ success: true, data }))
+            .catch(error => resolve({ success: false, error: error.message }));
     });
 });
