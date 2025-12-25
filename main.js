@@ -408,9 +408,77 @@ ipcMain.handle('login-google', async (event, clientId) => {
 
             // Step 2: Google redirects here with token in hash
             if (urlObj.pathname === '/callback') {
-                res.writeHead(200, { 'Content-Type': 'text/html' });
-                // Return HTML that extracts hash params and POSTs them to /token
-                res.end(`<html><body><h1>Success</h1><p>You can return to the app.</p><script>const hash=window.location.hash.substring(1);const params=new URLSearchParams(hash);if(params.has('id_token')){fetch('/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id_token:params.get('id_token'),access_token:params.get('access_token')})})}</script></body></html>`);
+                res.writeHead(200, {'Content-Type': 'text/html'});
+                res.end(`
+    <html>
+      <head>
+        <title>Authenticating...</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+            text-align: center;
+          }
+          .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
+          }
+          h1 { color: #333; margin-bottom: 16px; font-size: 24px; }
+          p { color: #666; margin-bottom: 0; line-height: 1.5; }
+          .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+          }
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="spinner"></div>
+          <h1>We're authenticating...</h1>
+          <p>Please check your app for successful login.</p>
+          <p style="font-size: 0.9em; margin-top: 10px; color: #999;">You can close this tab once the app updates.</p>
+        </div>
+        <script>
+          const hash = window.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          
+          if (params.has('id_token')) {
+            fetch('/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id_token: params.get('id_token'),
+                access_token: params.get('access_token')
+              })
+            }).then(() => {
+               document.querySelector('h1').textContent = "Success!";
+               document.querySelector('p').textContent = "You can now return to the app.";
+               document.querySelector('.spinner').style.display = 'none';
+            });
+          } else {
+            document.querySelector('h1').textContent = "Authentication Failed";
+            document.querySelector('p').textContent = "No token found. Please try again.";
+            document.querySelector('.spinner').style.display = 'none';
+          }
+        </script>
+      </body>
+    </html>
+  `);
                 return;
             }
 
