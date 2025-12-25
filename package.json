@@ -2,7 +2,7 @@
   "name": "faranux-product-allocation",
   "productName": "Inventory Manager",
   "appId": "com.bunsenplus.fxproductallocation",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Desktop application for product allocation management",
   "icon": "./assets/icon.png",
   "main": "main.js",
