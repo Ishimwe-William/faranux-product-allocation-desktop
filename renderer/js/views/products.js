@@ -6,6 +6,7 @@ import { router } from '../router.js';
 const ITEMS_PER_PAGE = 20;
 let currentIndex = 0;
 let filteredProducts = [];
+let viewMode = 'card'; // 'card' or 'list'
 
 export function renderProductsView() {
   const container = document.getElementById('view-container');
@@ -24,8 +25,16 @@ export function renderProductsView() {
         <span class="material-icons">search</span>
         <input type="text" id="product-search" placeholder="Search SKU, name, or category...">
       </div>
+      <div class="view-toggle" style="display: flex; gap: 4px; background: var(--color-bg-secondary); border-radius: 8px; padding: 4px;">
+        <button id="card-view-btn" class="view-toggle-btn ${viewMode === 'card' ? 'active' : ''}" data-view="card">
+          <span class="material-icons">grid_view</span>
+        </button>
+        <button id="list-view-btn" class="view-toggle-btn ${viewMode === 'list' ? 'active' : ''}" data-view="list">
+          <span class="material-icons">view_list</span>
+        </button>
+      </div>
     </div>
-    <div class="products-list" id="products-list"></div>
+    <div class="products-list ${viewMode === 'list' ? 'list-view' : ''}" id="products-list"></div>
     <div id="sentinel" style="height: 20px;"></div>
   `;
 
@@ -35,7 +44,32 @@ export function renderProductsView() {
   // 3. Search Logic
   document.getElementById('product-search')?.addEventListener('input', handleProductSearch);
 
-  // 4. Navigation (Event Delegation)
+  // 4. View Toggle
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const newView = e.currentTarget.dataset.view;
+      if (newView !== viewMode) {
+        viewMode = newView;
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+
+        // UPDATED: Toggle the CSS class on the container to switch grid layouts
+        const listContainer = document.getElementById('products-list');
+        if (viewMode === 'list') {
+          listContainer.classList.add('list-view');
+        } else {
+          listContainer.classList.remove('list-view');
+        }
+
+        // Reload products with new view
+        currentIndex = 0;
+        document.getElementById('products-list').innerHTML = '';
+        loadMoreProducts();
+      }
+    });
+  });
+
+  // 5. Navigation (Event Delegation)
   document.getElementById('products-list').addEventListener('click', (e) => {
     const row = e.target.closest('.location-row');
     if (row) {
@@ -44,7 +78,7 @@ export function renderProductsView() {
     }
   });
 
-  // 5. Infinite Scroll Observer
+  // 6. Infinite Scroll Observer
   const observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && currentIndex < filteredProducts.length) {
       loadMoreProducts();
@@ -65,7 +99,12 @@ function loadMoreProducts() {
     return;
   }
 
-  const html = nextBatch.map(p => renderProductCard(p, state.products.locations)).join('');
+  const html = nextBatch.map(p =>
+      viewMode === 'card'
+          ? renderProductCard(p, state.products.locations)
+          : renderProductListItem(p, state.products.locations)
+  ).join('');
+
   list.insertAdjacentHTML('beforeend', html);
   currentIndex += ITEMS_PER_PAGE;
 }
@@ -79,6 +118,10 @@ function renderProductCard(matchedProduct, locations) {
   const fullProductName = product.product_name || 'Unnamed Product';
   const displayProductName = fullProductName.length > 27 ? fullProductName.substring(0, 27) + '...' : fullProductName;
 
+  // Get branch quantities
+  const branchQtys = product.branchQuantities || {};
+  const branchEntries = Object.entries(branchQtys);
+
   return `
     <div class="card product-card-compact" style="padding: 16px; margin-bottom: 12px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
@@ -91,10 +134,24 @@ function renderProductCard(matchedProduct, locations) {
             ${product.category ? `<span style="color: var(--color-border)">•</span> <span>${product.category}</span>` : ''}
           </div>
         </div>
-        <div class="qty-badge-compact" style="background: ${qtyColor}15; color: ${qtyColor}; border: 1px; solid-${qtyColor}-30;">
+        <div class="qty-badge-compact" style="background: ${qtyColor}15; color: ${qtyColor}; border: 1px solid ${qtyColor}30;">
           ${sheetQty}
         </div>
       </div>
+
+      ${branchEntries.length > 0 ? `
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light); font-size: 13px;">
+          ${branchEntries.map(([branch, qty]) => {
+    const branchColor = qty >= 5 ? '#10b981' : (qty > 0 ? '#f59e0b' : '#ef4444');
+    return `
+              <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--color-bg-secondary); border-radius: 6px;">
+                <span style="color: var(--color-text-secondary); font-weight: 500;">${branch}:</span>
+                <span style="color: ${branchColor}; font-weight: 600;">${qty}</span>
+              </div>
+            `;
+  }).join('')}
+        </div>
+      ` : ''}
 
       ${wooProduct ? `
         <div style="display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-light); font-size: 14px;">
@@ -118,6 +175,78 @@ function renderProductCard(matchedProduct, locations) {
             </div>
           `).join('')
   }
+      </div>
+    </div>
+  `;
+}
+
+function renderProductListItem(matchedProduct, locations) {
+  const { sheetProduct: product, wooProduct, sheetQuantity: sheetQty, wooQuantity: wooQty } = matchedProduct;
+  const productLocations = findProductLocations(locations, product.sku);
+  const qtyColor = sheetQty >= 10 ? '#10b981' : (sheetQty > 0 ? '#f59e0b' : '#ef4444');
+  const diff = sheetQty - (wooQty || 0);
+
+  const fullProductName = product.product_name || 'Unnamed Product';
+
+  // Get branch quantities
+  const branchQtys = product.branchQuantities || {};
+  const branchEntries = Object.entries(branchQtys);
+
+  return `
+    <div class="card" style="padding: 12px 16px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 15px; font-weight: 600; color: var(--color-text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+            title="${fullProductName}">
+            ${fullProductName}
+          </div>
+          <div style="font-size: 13px; color: var(--color-text-tertiary); display: flex; align-items: center; gap: 8px;">
+            <span class="product-sku-compact">
+              <span class="material-icons" style="font-size: 13px;">qr_code</span> ${product.sku}
+            </span>
+            ${product.category ? `<span style="color: var(--color-border)">•</span> <span>${product.category}</span>` : ''}
+          </div>
+        </div>
+
+        ${branchEntries.length > 0 ? `
+          <div style="flex: 0 0 auto; display: flex; gap: 8px; align-items: center;">
+            ${branchEntries.map(([branch, qty]) => {
+    const branchColor = qty >= 5 ? '#10b981' : (qty > 0 ? '#f59e0b' : '#ef4444');
+    return `
+                <div style="text-align: center; font-size: 12px;">
+                  <div style="color: var(--color-text-secondary); margin-bottom: 2px; font-weight: 500;">${branch}</div>
+                  <div style="font-weight: 600; color: ${branchColor}; font-size: 14px;">${qty}</div>
+                </div>
+              `;
+  }).join('')}
+          </div>
+        ` : ''}
+
+        <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 16px;">
+          <div style="text-align: center; font-size: 13px;">
+            <div style="color: var(--color-text-secondary); margin-bottom: 2px; font-weight: 500;">Total</div>
+            <div style="font-weight: 600; color: ${qtyColor}; font-size: 15px;">${sheetQty}</div>
+          </div>
+
+          ${wooProduct ? `
+            <div style="text-align: center; font-size: 13px;">
+              <div style="color: var(--color-text-secondary); margin-bottom: 2px; font-weight: 500;">Woo</div>
+              <div style="font-weight: 600; color: ${diff === 0 ? 'var(--color-success)' : 'var(--color-error)'}; font-size: 15px;">${wooQty}</div>
+            </div>
+          ` : ''}
+
+          <div style="min-width: 100px; font-size: 13px;">
+            ${productLocations.length === 0
+      ? `<span style="color: var(--color-warning);">No location</span>`
+      : productLocations.length === 1
+          ? `<div class="location-row" data-shelf-id="${productLocations[0].shelfId}" data-position="${productLocations[0].position}" data-sku="${product.sku}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--color-bg-secondary); border-radius: 6px;">
+                     <span class="material-icons" style="font-size: 16px;">store</span>
+                     <span><b>${productLocations[0].shelf}</b> — ${productLocations[0].position}</span>
+                   </div>`
+          : `<span style="color: var(--color-text-secondary);">${productLocations.length} locations</span>`
+  }
+          </div>
+        </div>
       </div>
     </div>
   `;

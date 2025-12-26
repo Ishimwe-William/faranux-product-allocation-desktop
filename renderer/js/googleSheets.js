@@ -39,7 +39,7 @@ const COLUMN_MAPPINGS = {
     product_name: ['product_name', 'item', 'name', 'product', 'item_name', 'product name', 'item name'],
     sku: ['sku', 'item_code', 'product_code', 'item code', 'product code', 'part_number', 'part number'],
     serial_number: ['s/n', 'sn', 'serial', 'no', 'number', '#', 'index'],
-    quantity: ['quantity','total quantity', 'total qty', 'qty', 'stock', 'amount', 'count', 'inv', 'inventory'],
+    quantity: ['quantity','total quantity', 'total qty', 'qty', 'stock', 'amount', 'count', 'inv', 'inventory', 'total'],
     category: ['category', 'type', 'group', 'class', 'classification'],
     description: ['description', 'desc', 'details', 'notes', 'info'],
     branch: ['branch', 'location', 'store', 'warehouse', 'site'],
@@ -57,14 +57,49 @@ function normalizeHeader(header) {
 function mapHeaders(rawHeaders) {
     const headerMap = {};
     const normalizedHeaders = rawHeaders.map(h => ({ original: h, normalized: normalizeHeader(h) }));
+
+    // Map SKU first
     const skuVariations = COLUMN_MAPPINGS.sku;
     for (const variation of skuVariations) {
         const normalizedVariation = normalizeHeader(variation);
         const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
         if (match) { headerMap.sku = match.original; break; }
     }
+
+    // Find the SKU column index
+    const skuIndex = rawHeaders.indexOf(headerMap.sku);
+
+    // Find the TOTAL column index
+    const totalVariations = ['total', 'total_quantity', 'total_qty', 'qty', 'quantity'];
+    let totalIndex = -1;
+    for (const variation of totalVariations) {
+        const normalizedVariation = normalizeHeader(variation);
+        const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
+        if (match) {
+            totalIndex = rawHeaders.indexOf(match.original);
+            headerMap.quantity = match.original;
+            break;
+        }
+    }
+
+    // Extract branch quantity columns (between SKU and TOTAL)
+    const branchQuantities = [];
+    if (skuIndex !== -1 && totalIndex !== -1) {
+        for (let i = skuIndex + 1; i < totalIndex; i++) {
+            const header = rawHeaders[i];
+            if (header && header.trim()) {
+                branchQuantities.push({
+                    branch: header.trim(),
+                    index: i
+                });
+            }
+        }
+    }
+    headerMap.branchQuantities = branchQuantities;
+
+    // Map other standard fields
     Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
-        if (standardField === 'sku' || standardField === 'serial_number') return;
+        if (standardField === 'sku' || standardField === 'serial_number' || standardField === 'quantity') return;
         const variations = COLUMN_MAPPINGS[standardField];
         for (const variation of variations) {
             const normalizedVariation = normalizeHeader(variation);
@@ -72,14 +107,21 @@ function mapHeaders(rawHeaders) {
             if (match) { headerMap[standardField] = match.original; break; }
         }
     });
+
+    // Fallback to S/N if no SKU
     if (!headerMap.sku) {
         const serialVariations = COLUMN_MAPPINGS.serial_number;
         for (const variation of serialVariations) {
             const normalizedVariation = normalizeHeader(variation);
             const match = normalizedHeaders.find(h => h.normalized === normalizedVariation);
-            if (match) { headerMap.sku = match.original; console.warn('[GoogleSheets] No SKU column found. Using S/N column as identifier.'); break; }
+            if (match) {
+                headerMap.sku = match.original;
+                console.warn('[GoogleSheets] No SKU column found. Using S/N column as identifier.');
+                break;
+            }
         }
     }
+
     return headerMap;
 }
 
@@ -89,6 +131,18 @@ function getFieldValue(row, headers, headerMap, standardField) {
     const headerIndex = headers.indexOf(actualHeader);
     if (headerIndex === -1) return '';
     return row[headerIndex] ? String(row[headerIndex]).trim() : '';
+}
+
+function getBranchQuantities(row, headerMap) {
+    const branchQtys = {};
+    if (headerMap.branchQuantities) {
+        headerMap.branchQuantities.forEach(branchInfo => {
+            const value = row[branchInfo.index];
+            const qty = value ? parseInt(value) : 0;
+            branchQtys[branchInfo.branch] = isNaN(qty) ? 0 : qty;
+        });
+    }
+    return branchQtys;
 }
 
 // UPDATED: Prioritize Firebase config sheet ID over env
@@ -177,6 +231,8 @@ function parseProductsFromExcel(workbook) {
         Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
             product[standardField] = getFieldValue(row, rawHeaders, headerMap, standardField);
         });
+        // Add branch quantities
+        product.branchQuantities = getBranchQuantities(row, headerMap);
         return product;
     }).filter(p => p.sku);
 }
@@ -305,6 +361,8 @@ export async function fetchProducts(sheetId = null) {
             Object.keys(COLUMN_MAPPINGS).forEach(standardField => {
                 product[standardField] = getFieldValue(row, rawHeaders, headerMap, standardField);
             });
+            // Add branch quantities
+            product.branchQuantities = getBranchQuantities(row, headerMap);
             return product;
         }).filter(p => p.sku);
     } catch (error) {
